@@ -1,0 +1,4 @@
+node_modules/
+docs/data/*.json
+!docs/data/.keep
+.DS_Store

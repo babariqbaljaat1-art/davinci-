@@ -1,0 +1,56 @@
+# Runs the Da Vinci scanner 24/7 on GitHub's servers (free for public repos)
+# and publishes the mobile app + fresh data to GitHub Pages.
+name: scan
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'   # every 10 minutes (GitHub may delay a few minutes at busy times)
+  workflow_dispatch:          # "Run workflow" button for a manual scan
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: scan
+  cancel-in-progress: false
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    env:
+      APP_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Engine tests
+        run: node --test test/engine.test.js
+
+      - name: Restore alert history from the live app
+        run: |
+          mkdir -p docs/data
+          curl -fsSL "${APP_URL}data/state.json" -o docs/data/state.json || echo '{"sent":{}}' > docs/data/state.json
+
+      - name: Scan markets, backtest, send Telegram alerts
+        run: node scanner/run.js
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TWELVEDATA_API_KEY: ${{ secrets.TWELVEDATA_API_KEY }}
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+      - id: deploy
+        uses: actions/deploy-pages@v4
