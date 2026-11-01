@@ -202,7 +202,7 @@ export class Chart {
       if (i < 0) continue;
       const x = Math.round(this.barToX(i)) + 0.5;
       ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
-      ctx.fillText(timeLabel(c[i].t, this.tf), x - 18, H + 5);
+      if (x > 22 && x < W - 22) ctx.fillText(timeLabel(c[i].t, this.tf), x - 18, H + 5);
     }
 
     ctx.save();
