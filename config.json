@@ -8,7 +8,11 @@
       "twelvedata": "XAU/USD",
       "source": "yahoo",
       "digits": 2,
-      "spread": 0.1
+      "spread": 0.1,
+      "kind": "metal",
+      "ccy": [
+        "USD"
+      ]
     },
     {
       "id": "NAS100",
@@ -16,7 +20,11 @@
       "yahoo": "NQ=F",
       "source": "yahoo",
       "digits": 1,
-      "spread": 0.5
+      "spread": 0.5,
+      "kind": "index",
+      "ccy": [
+        "USD"
+      ]
     },
     {
       "id": "US30",
@@ -24,7 +32,11 @@
       "yahoo": "YM=F",
       "source": "yahoo",
       "digits": 0,
-      "spread": 2
+      "spread": 2,
+      "kind": "index",
+      "ccy": [
+        "USD"
+      ]
     }
   ],
   "timeframes": [
@@ -43,8 +55,11 @@
       8,
       11
     ],
-    "refLevels": true,
-    "bias": "daily"
+    "ie": true,
+    "ieMin": "B",
+    "manage": "ie",
+    "maxTradesPerDay": 2,
+    "maxLossesPerDay": 2
   },
   "chartBars": 600,
   "alerts": {

@@ -50,7 +50,15 @@ export function pivots(candles, k = 3) {
  * If SL and TP are both inside one bar, SL is assumed first (conservative).
  * costR: round-trip cost (spread + commission + slippage) expressed in R.
  */
-export function simulateTrade(candles, setup, { costR = 0.05, maxBarsInTrade = 500, partialR = 0, partialPct = 0.5 } = {}) {
+export function simulateTrade(candles, setup, { costR = 0.05, maxBarsInTrade = 500, partialR = 0, partialPct = 0.5, manage = 'simple', t1Pct = 0.8, t1R = 0, beAt = null, t2 = null, closeHour = 16 } = {}) {
+  if (manage === 'ie') {
+    // t1R: first target at a fixed R ("1:3 minimum to the first target"), the runner goes on to the liquidity (tp)
+    const risk = Math.abs(setup.sl - setup.entry), sgn = setup.dir === 'short' ? -1 : 1;
+    if (t1R > 0 && Math.abs(setup.tp - setup.entry) / risk > t1R + 1e-9) {
+      return simulateIE(candles, setup, { costR, maxBarsInTrade, t1Pct, beAt, t1: setup.entry + sgn * t1R * risk, t2: setup.tp, closeHour });
+    }
+    return simulateIE(candles, setup, { costR, maxBarsInTrade, t1Pct, beAt, t1: setup.tp, t2, closeHour });
+  }
   if (partialR > 0) return simulateManaged(candles, setup, { costR, maxBarsInTrade, partialR, partialPct });
   const { dir, entry, sl, tp } = setup;
   const short = dir === 'short';
@@ -300,4 +308,58 @@ function simulateManaged(candles, setup, { costR, maxBarsInTrade, partialR, part
   }
   const exit = candles[end].c, open = (short ? entry - exit : exit - entry) / risk;
   return { status: 'timeout', fillAt, exitAt: end, r: (banked ? partialPct * partialR + (1 - partialPct) * open : open) - costR, exit };
+}
+
+/**
+ * Inter Equity management (webinars + live calls):
+ *  - before the first target: once the next structural low/high (beAt) is taken, stop to break-even
+ *  - at the first target (the opposing liquidity, >= 1:3) close t1Pct (78-90%), stop to break-even
+ *  - the rest runs to the next liquidity (t2) if there is one
+ *  - whatever is still open is closed at closeHour New York (Friday: noon), same trading day
+ * Same conventions as simulateTrade (stop first when a bar touches both).
+ */
+function simulateIE(candles, setup, { costR, maxBarsInTrade, t1Pct, beAt, t1, t2, closeHour }) {
+  const { dir, entry, sl, tp } = setup;   // tp = the liquidity: reached before the fill -> setup done (missed)
+  const short = dir === 'short';
+  const risk = Math.abs(sl - entry);
+  if (!(risk > 0)) return { status: 'invalid' };
+  const R = price => (short ? entry - price : price - entry) / risk;
+  let fillAt = -1;
+  const last = Math.min(setup.expiresAt ?? candles.length - 1, candles.length - 1);
+  for (let i = setup.armedAt; i <= last; i++) {
+    const b = candles[i];
+    if (short ? b.h >= entry : b.l <= entry) { fillAt = i; break; }
+    if (short ? b.l <= tp : b.h >= tp) return { status: 'missed', at: i };
+  }
+  if (fillAt < 0) return { status: last >= candles.length - 1 ? 'pending' : 'expired' };
+  const day = nyClock(candles[fillAt].t).tradeDay;
+  let stop = sl, open = 1, realized = 0, t1Done = false, be = false;
+  const done = (i, status, exit) => {
+    const r = realized - costR;
+    return { status: status || (r > 0 ? 'win' : 'loss'), fillAt, exitAt: i, r, exit, partial: t1Done, be: be && Math.abs(realized) < 1e-9 };
+  };
+  const end = Math.min(candles.length - 1, fillAt + maxBarsInTrade);
+  for (let i = fillAt; i <= end; i++) {
+    const b = candles[i];
+    if (short ? b.h >= stop : b.l <= stop) { realized += open * R(stop); return done(i, null, stop); }
+    const reach = lv => lv != null && (short ? b.l <= lv : b.h >= lv) && (i > fillAt || (short ? b.o >= entry : b.o <= entry));
+    if (!t1Done && reach(beAt)) { stop = entry; be = true; }
+    if (!t1Done && reach(t1)) {
+      realized += t1Pct * R(t1); open -= t1Pct; t1Done = true; stop = entry; be = true;
+      if (open <= 1e-9 || t2 == null) { realized += open * R(t1); open = 0; return done(i, 'win', t1); }
+    }
+    if (t1Done && reach(t2)) { realized += open * R(t2); return done(i, 'win', t2); }
+    const k = nyClock(b.t);
+    const friday = new Date(k.date + 'T00:00:00Z').getUTCDay() === 5;
+    if (k.tradeDay !== day || k.hour >= (friday ? Math.min(12, closeHour) : closeHour)) {
+      realized += open * R(b.c);
+      return done(i, t1Done ? 'win' : 'timeout', b.c);
+    }
+  }
+  if (end >= candles.length - 1) {
+    const mark = candles[candles.length - 1].c;
+    return { status: 'open', fillAt, r: realized + open * R(mark), mark, partial: t1Done };
+  }
+  realized += open * R(candles[end].c);
+  return done(end, 'timeout', candles[end].c);
 }

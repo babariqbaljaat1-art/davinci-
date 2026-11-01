@@ -65,6 +65,16 @@
         SendText $ctx 200 'application/json' $body
         continue
       }
+      if ($path -eq '/api/news') {
+        # this week's economic calendar (red-folder news) for the Inter Equity time rules; cached 1 hour
+        $now = [DateTime]::UtcNow; $hit = $cache['news']
+        if ($hit -and ($now - $hit.at).TotalMinutes -lt 60) { SendText $ctx 200 'application/json' $hit.body; continue }
+        $body = '[]'
+        try { $body = (New-Client).DownloadString('https://nfs.faireconomy.media/ff_calendar_thisweek.json') } catch { if ($hit) { $body = $hit.body } }
+        $cache['news'] = @{ at = $now; body = $body }
+        SendText $ctx 200 'application/json' $body
+        continue
+      }
       if ($path -eq '/api/config') {
         $f = Join-Path $DataDir 'config.json'
         if ($req.HttpMethod -eq 'POST') {

@@ -26,7 +26,7 @@ async function scan() {
       for (const s of rep.setups) {
         const k = `${key}|${cfg.strategy}|${s.id}`, prev = state.sent[k];
         const fresh = s.armedT != null && s.armedT >= lastT - 6 * tfSeconds(tf);
-        if ((s.status === 'pending' || s.status === 'open') && !prev && fresh) {
+        if ((s.status === 'pending' || s.status === 'open') && !prev && fresh && !s.skip) {
           state.sent[k] = s.status;
           if (allow) await alert({ ...alertText(rep, s), telegram: true });
         } else if (prev && FINAL.has(s.status) && !FINAL.has(prev)) {

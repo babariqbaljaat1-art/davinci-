@@ -12,7 +12,7 @@ const closed = t => ['win', 'loss', 'timeout'].includes(t.result.status);
  */
 export function backtest(candles, params = {}, { mcRuns = 5000, splitAt = 0.7 } = {}) {
   const setups = findSetups(candles, params);
-  const trades = tradesFromSetups(setups, { candles, maxPerDay: params.maxTradesPerDay || 0 });
+  const trades = tradesFromSetups(setups, { candles, maxPerDay: params.maxTradesPerDay || 0, maxLossesPerDay: params.maxLossesPerDay || 0 });
   const done = trades.filter(closed);
   const cut = Math.floor(candles.length * splitAt);
   const inS = done.filter(t => t.result.fillAt < cut);
@@ -34,6 +34,7 @@ export function backtest(candles, params = {}, { mcRuns = 5000, splitAt = 0.7 } 
     trades: done.map(t => ({
       id: t.id, dir: t.dir, fill: candles[t.result.fillAt].t, exit: candles[t.result.exitAt].t,
       entry: t.entry, sl: t.sl, tp: t.tp, rr: +t.rr.toFixed(2), r: +t.result.r.toFixed(2), status: t.result.status,
+      grade: t.ie?.grade, be: !!t.result.be,
     })),
   };
 }
@@ -50,7 +51,7 @@ export function robustness(candles, base = {}) {
         for (const bias of ['none', 'htf'])
           grid.push({ ...base, pivotK, entryMode, minRR, bias });
   return grid.map(p => {
-    const trades = tradesFromSetups(findSetups(candles, p)).filter(closed);
+    const trades = tradesFromSetups(findSetups(candles, p), { candles, maxPerDay: p.maxTradesPerDay || 0, maxLossesPerDay: p.maxLossesPerDay || 0 }).filter(closed);
     const s = stats(trades);
     return { pivotK: p.pivotK, entryMode: p.entryMode, minRR: p.minRR, bias: p.bias, trades: s.trades, winRate: +s.winRate.toFixed(3), expectancyR: +s.expectancyR.toFixed(3), profitFactor: Number.isFinite(s.profitFactor) ? +s.profitFactor.toFixed(2) : null, maxDrawdownR: +s.maxDrawdownR.toFixed(2) };
   });

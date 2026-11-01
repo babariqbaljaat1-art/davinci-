@@ -72,6 +72,23 @@
       <div id="live" class="live" tabindex="-1"></div>
     </section>
 
+    <section class="card" aria-labelledby="disc-h">
+      <div class="section-head">
+        <h2 id="disc-h">Risk aur discipline</h2>
+        <button class="btn-ghost" type="button" id="journal-csv">Journal CSV</button>
+      </div>
+      <p class="verdict" id="disc-verdict" role="status" aria-live="polite"></p>
+      <div class="acct">
+        <label class="field">Account ($)<input id="acct-balance" name="balance" type="number" inputmode="decimal" min="0" step="100" autocomplete="off"></label>
+        <label class="field">Risk per trade (%)<input id="acct-risk" name="riskPct" type="number" inputmode="decimal" min="0.05" max="5" step="0.05" autocomplete="off"></label>
+      </div>
+      <p class="small muted">IE rules: A setup = poora risk, B setup = aadha. Din mein 2 trades / 2 losses ke baad band. Hafte mein 1-3 achhi trades kaafi hain.</p>
+      <details class="more">
+        <summary>Journal (is device par)</summary>
+        <div class="table-wrap"><table id="journal"><thead><tr><th scope="col">Date</th><th scope="col">Trade</th><th scope="col">Result</th><th scope="col">Note</th></tr></thead><tbody></tbody></table></div>
+      </details>
+    </section>
+
     <section class="card" aria-labelledby="bt-h">
       <div class="section-head">
         <h2 id="bt-h">Backtest</h2>
@@ -102,14 +119,16 @@
   </section>
 
   <section class="card rules" aria-labelledby="rules-h">
-    <h2 id="rules-h">Da Vinci rules (jo software check karta hai)</h2>
+    <h2 id="rules-h">Inter Equity rules (jo software check karta hai)</h2>
+    <p class="small muted">Saari 155 videos (course, case studies, 39 webinars, 15 live calls) se banaya gaya. Har setup par 20 rules check hote hain. A = sab theek (poora risk), B = core theek, kuch warning (aadha risk), X = koi hard rule toota (IE ye trade nahi leta, alert nahi aata).</p>
     <ol class="steps-explain">
-      <li><strong>Liquidity block banta hai.</strong> Price kisi purane high/low ki liquidity leta hai (sweep), phir foran displacement deta hai: previous candle ke low/high ke paar close, ya imbalance (FVG). Wo high/low LB hai.</li>
-      <li><strong>LB ke neeche buildup.</strong> Price pichla low tod deti hai (BOS, early sellers induce hote hain), phir LB se neeche lower high banati hai. Bullish mein ye ulta hota hai.</li>
-      <li><strong>Lows par liquidity engineer hoti hai.</strong> Neeche wala low respect hota hai (baad wala low us se upar rehta hai), to uske neeche liquidity rehti hai. Yahi target hai.</li>
-      <li><strong>Buildup liya, entry.</strong> Price buildup highs le kar LB mein aati hai: wahan sell. Stop LB ke upar, target lows. RR kam az kam 1:3 hona chahiye.</li>
+      <li><strong>Setup (Da Vinci).</strong> Purani liquidity sweep ho kar liquidity block bane, displacement ho. Neeche buildup (BOS + lower high), lows par engineered liquidity, phir buildup le kar price LB mein aaye: wahan entry. Stop LB ke paar, pehle target tak kam az kam 1:3. With structure trade nahi. Liquidity "from the left" sweep honi chahiye, aur LB ke paar liquidity bachi ho to warning.</li>
+      <li><strong>Direction.</strong> HTF (4h) narrative ke saath. Buy se pehle aaj ka koi low (PDL, Asia, London) liya gaya ho, sell se pehle high. All-time-high / HTF extreme par warning.</li>
+      <li><strong>Time.</strong> Sirf New York: entry 8-11 NY (indices 9:30 stock open ke baad). NFP/FOMC (aur PC app mein live red news) se pehle entry nahi. Bank holiday par trade nahi. 9-10 trap hour.</li>
+      <li><strong>Day type.</strong> Kal bara move hua to aaj range day (skip). Asia aur London dono bara move kar chuke hon to NY aksar dead. FOMC/NFP se pehle wala din: warning.</li>
+      <li><strong>Management.</strong> Pehle target par 80% close aur stop break-even; agla structural low/high liya to break-even; baqi agli liquidity tak, 4 pm NY (Friday 12) tak band. Din mein 2 trades / 2 losses max.</li>
     </ol>
-    <p class="muted small">Setup cancel ho jata hai agar price LB ke upar close kare, entry se pehle lows le le, ya bohot der lage. Yeh course ki ek mechanical approximation hai. Discretionary cheezein (HTF narrative, "feel") isme poori nahi aatin.</p>
+    <p class="muted small">Marco ka apna strike rate (22 Mar 2025 webinar): "35 se 50%". Profit RR (1:3+) aur partials se aata hai, 70-80% win rate se nahi. Yeh software rules ko mechanically check karta hai; HTF "feel" aur discretion poori tarah code mein nahi aa sakti.</p>
   </section>
 </main>
 

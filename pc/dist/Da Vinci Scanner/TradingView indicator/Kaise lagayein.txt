@@ -11,8 +11,24 @@ TradingView par lagane ka tareeqa
 Chart par kya dikhega
 ---------------------
 - Neela box: Liquidity Block (LB)
-- Lal box: stop loss zone, hara box: target zone, label par SELL/BUY aur RR
+- Lal box: stop loss zone, hara box: target zone, label par SELL/BUY, IE grade aur RR
+- Label par mouse rakho (phone par tap): IE checklist ki warnings dikhengi
 - Upar daayein table: is chart ki history par trades, win rate aur avg R
+
+Inter Equity grade (A / B / X)
+------------------------------
+Har setup ko course ke rules par check kiya jata hai (saari 155 videos se banaye gaye):
+- A = saare rules theek: poora risk
+- B = core rules theek, kuch warning (HTF clear nahi, aaj ka high/low abhi nahi liya, chhota
+      sweep, stop bara, HTF extreme, kal FOMC/NFP, Asia+London dono bara move): aadha risk
+- X = koi hard rule toota: chart par nahi aata, alert nahi aata
+      (bank holiday, FOMC din, NFP 8:30 se pehle, kal bara move, 4h HTF ulti direction, stop bohot bara)
+- Indices (US30, NAS100 wagaira) 9:30 New York stock open ke baad hi arm hote hain.
+- Din mein 2 trades / 2 losses ke baad us din aur setup nahi.
+- "Show and alert from grade": B (A aur B dono) ya A (sirf A).
+Note: CPI aur doosri red news TradingView ko pata nahi; ForexFactory par khud dekho.
+Trade management (T1 par 80% close, stop break-even, baqi runner) label ke tooltip mein likha hai;
+table ke stats simple hain (poora size target ya stop tak).
 
 Alert (phone par TradingView app se)
 ------------------------------------

@@ -7,6 +7,7 @@ import { existsSync } from 'node:fs';
 import { fetchCandles } from './data.js';
 import { buildReport, indexItem } from '../docs/engine/report.js';
 import { sendTelegram, setupMessage, resultMessage } from './telegram.js';
+import { liveEvents } from '../docs/engine/calendar.js';
 
 const DRY = process.argv.includes('--dry');
 const ROOT = new URL('..', import.meta.url).pathname;
@@ -21,6 +22,12 @@ async function main() {
   const state = await readJSON(`${DATA}/state.json`, { sent: {} });
   const appUrl = process.env.APP_URL || cfg.appUrl;
   const index = { updated: Math.floor(Date.now() / 1000), appUrl, items: [] };
+  // this week's red-folder news for the Inter Equity time rules (optional: rules fall back to FOMC/NFP dates)
+  let feed = null;
+  if (cfg.params.ie) {
+    try { const r = await fetch('https://nfs.faireconomy.media/ff_calendar_thisweek.json', { signal: AbortSignal.timeout(10000) }); if (r.ok) feed = await r.json(); }
+    catch (e) { console.log(`news feed: ${e.message}`); }
+  }
 
   for (const m of cfg.markets) {
     for (const tf of cfg.timeframes) {
@@ -32,7 +39,8 @@ async function main() {
           await mkdir(`${ROOT}raw`, { recursive: true });
           await writeFile(`${ROOT}raw/${key}.json`, JSON.stringify(candles));
         }
-        const out = buildReport(m, tf, candles, cfg.params, { chartBars: cfg.chartBars, mcRuns: 5000, updated: index.updated });
+        const params = { ...cfg.params, kind: m.kind || 'fx', ieParams: { live: feed ? liveEvents(feed, m.ccy || ['USD']) : null } };
+        const out = buildReport(m, tf, candles, params, { chartBars: cfg.chartBars, mcRuns: 5000, updated: index.updated });
         await writeFile(`${DATA}/${key}.json`, JSON.stringify(out));
         const item = indexItem(out);
         index.items.push(item);
@@ -45,7 +53,7 @@ async function main() {
         for (const s of shown) {
           const prev = state.sent[s.id + key];
           const fresh = s.armedT != null && s.armedT >= lastT - 6 * tfSec;   // never alert old setups
-          if ((s.status === 'pending' || s.status === 'open') && !prev && fresh && cfg.alerts.onNewSetup && edgeOk) {
+          if ((s.status === 'pending' || s.status === 'open') && !prev && fresh && !s.skip && cfg.alerts.onNewSetup && edgeOk) {
             if (!DRY) await sendTelegram(setupMessage(m, tf, s, bt, appUrl));
             state.sent[s.id + key] = s.status;
           } else if (prev && FINAL.has(s.status) && !FINAL.has(prev)) {

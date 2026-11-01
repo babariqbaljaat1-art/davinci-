@@ -1,0 +1,7 @@
+[
+ "IE rulebook test (saari 155 videos se 20 rules, 4 saal, 5 markets, spread ke saath): 5m par saare Da Vinci setups 2,612 trades, win 13%, -0.24R/trade. IE grade A+B: 820 trades, win 14%, -0.17R. Sirf grade A: 270 trades, win 10%, -0.61R. IE management (T1 par 80% + break-even + runner) se bhi result negative raha (T1 = 3R par win 22-25%).",
+ "15m par bhi wahi: saare setups -0.21R, grade A+B -0.19R (pehle 70% data -0.02R, unseen 30% -0.59R). Kisi IE variant ne dono hisson (pehle 70% aur unseen 30%) par positive result nahi diya.",
+ "Kaunse rules data mein madad karte hain: red-news filter (news se pehle wale setups -0.56R vs baqi -0.27R) aur session filter. Kuch rules data mein ulte nikle: LB ke paar liquidity wale setups (-0.18R) un se behtar the jin ke paar liquidity nahi thi (-0.36R); kal ke bare move ke baad wale din -0.32R ke bajaye +0.02R.",
+ "Reference trades: 1 July 2024 gold long (Study 1) software ne wahi nikali aur grade A diya. 2 Jan 2024 gold short (CS 2.0 #1, entry 2070.2): software ka 1m short 2070.0-2070.3 par, grade B.",
+ "Marco khud (22 March 2025 webinar): \"mera strike rate 35 se 50% hai... jo log 70-80% claim karte hain wo jhoot hai; 40-50% bohot achha hai, high 30s bhi theek.\""
+]

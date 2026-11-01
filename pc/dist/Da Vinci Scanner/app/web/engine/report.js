@@ -20,6 +20,9 @@ export function serializeSetup(s, c, digits) {
     extreme: s.extreme && { t: s.extreme.t, price: P(s.extreme.price) },
     entry: P(s.entry), sl: P(s.sl), tp: P(s.tp), rr: round(s.rr, 2),
     armedT: T(s.armedAt), fillT: T(r.fillAt), exitT: T(r.exitAt), r: round(r.r, 2),
+    mgmt: s.mgmt ? { beAt: P(s.mgmt.beAt), t2: P(s.mgmt.t2) } : null,
+    ie: s.ie ? { grade: s.ie.grade, risk: s.ie.risk, checks: s.ie.checks.map(c => [c.id, c.state, c.note]) } : null,
+    skip: !!s.skip,
     steps: {
       liquidityBlock: true,
       buildup: !!s.bos && s.buildup.length > 0,
@@ -63,7 +66,7 @@ export function buildReport(market, tf, candles, params, { chartBars = 600, mcRu
 
 /** Summary row for the market tabs. */
 export function indexItem(report) {
-  const live = report.setups.filter(s => s.status === 'pending' || s.status === 'open');
+  const live = report.setups.filter(s => (s.status === 'pending' || s.status === 'open') && !s.skip);
   const bt = report.backtest;
   return {
     key: report.key, market: report.market.id, name: report.market.name, tf: report.tf, lastPrice: report.lastPrice,

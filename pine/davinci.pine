@@ -9,6 +9,11 @@
 //  3. Engineered lows: a later low respects (does not break) the post-LB low.
 //  4. Entry: sell limit inside the LB, stop above the LB, target the lows / fixed R.
 //
+// Inter Equity rulebook (compiled from all 155 course videos, see the app): every armed setup gets a
+// grade. A = all rules met (full risk), B = core rules met with warnings (half risk), X = a hard rule
+// broken (bank holiday, FOMC day / before NFP, big move yesterday, HTF against, stop too big) -> not shown.
+// Indices only arm after the 9:30 New York stock open. Max 2 trades / 2 losses per day.
+//
 // Educational tool, not financial advice. Check the on-chart stats table before trusting any alert.
 
 //@version=5
@@ -34,7 +39,14 @@ costR      = input.float(0.05, "Cost per trade (R) for stats", minval=0, step=0.
 grpS = "Session filter (New York time)"
 useSess    = input.bool(true, "Only arm setups inside the session", group=grpS)
 sess       = input.session("0800-1100", "Session, New York time (8-11 = NY morning)", group=grpS)
-useBias    = input.bool(true, "Daily bias: buys only after the previous day low is taken, sells after the high", group=grpS)
+useBias    = input.bool(false, "Hard daily bias: buys only after the previous day low is taken (IE grading already warns)", group=grpS)
+grpI = "Inter Equity rules"
+useIE      = input.bool(true, "Grade setups with the Inter Equity rulebook (A / B / X)", group=grpI)
+ieMin      = input.string("B", "Show and alert from grade", options=["A", "B", "X"], group=grpI)
+instr      = input.string("Auto", "Instrument", options=["Auto", "FX / Gold", "Index"], group=grpI, tooltip="Indices wait for the 9:30 New York stock open")
+bigMoveX   = input.float(2.0, "Skip the day after a move this many times the average range", minval=1.2, step=0.1, group=grpI)
+maxDay     = input.int(2, "Max trades per day", minval=1, maxval=10, group=grpI)
+maxLoss    = input.int(2, "Stop for the day after this many losses", minval=1, maxval=10, group=grpI)
 grpV = "Display"
 showForming = input.bool(true, "Show forming setups (LB only)", group=grpV)
 showStats   = input.bool(true, "Show stats table", group=grpV)
@@ -51,11 +63,20 @@ var float dayL = na
 var float pdh = na
 var float pdl = na
 var int dBias = 0
+var ranges = array.new_float()
+var int dayTrades = 0
+var int dayLosses = 0
 if ta.change(time("D")) != 0
+    if not na(dayH)
+        array.push(ranges, dayH - dayL)
+        if array.size(ranges) > 12
+            array.shift(ranges)
     pdh := dayH
     pdl := dayL
     dayH := high
     dayL := low
+    dayTrades := 0
+    dayLosses := 0
 else
     dayH := na(dayH) ? high : math.max(dayH, high)
     dayL := na(dayL) ? low : math.min(dayL, low)
@@ -67,6 +88,198 @@ if not na(pdh)
     else if tookL and not tookH
         dBias := 1
 f_biasOk(int dir) => not useBias or (dir == 1 ? dBias == -1 : dBias == 1)
+
+// ---------- Inter Equity time / day rules (New York clock) ----------
+nyH = hour(time, "America/New_York") + minute(time, "America/New_York") / 60.0
+nyY = year(time, "America/New_York")
+nyM = month(time, "America/New_York")
+nyD = dayofmonth(time, "America/New_York")
+nyW = dayofweek(time, "America/New_York")
+tk = str.upper(syminfo.ticker)
+isIndex = instr == "Index" or (instr == "Auto" and (str.contains(tk, "US30") or str.contains(tk, "NAS") or str.contains(tk, "NQ") or str.contains(tk, "YM") or str.contains(tk, "US100") or str.contains(tk, "SPX") or str.contains(tk, "US500") or str.contains(tk, "DJI") or str.contains(tk, "ES1") or str.contains(tk, "DE40") or str.contains(tk, "GER")))
+
+f_easter(int y) =>
+    int a = y % 19
+    int b = math.floor(y / 100)
+    int c = y % 100
+    int d = math.floor(b / 4)
+    int e = b % 4
+    int f = math.floor((b + 8) / 25)
+    int g = math.floor((b - f + 1) / 3)
+    int hh = (19 * a + b - d - g + 15) % 30
+    int ii = math.floor(c / 4)
+    int kk = c % 4
+    int ll = (32 + 2 * e + 2 * ii - hh - kk) % 7
+    int mm = math.floor((a + 11 * hh + 22 * ll) / 451)
+    int em = math.floor((hh + ll - 7 * mm + 114) / 31)
+    int ed = ((hh + ll - 7 * mm + 114) % 31) + 1
+    [em, ed]
+
+// US bank holidays + 24/25/26/31 Dec (dw: Pine dayofweek, 1 = Sunday)
+f_isHoliday(int y, int mo, int d, int dw) =>
+    bool mon = dw == dayofweek.monday
+    bool fri = dw == dayofweek.friday
+    bool hol = (mo == 1 and d == 1) or (mo == 1 and d == 2 and mon)
+    hol := hol or (mo == 1 and mon and d >= 15 and d <= 21)
+    hol := hol or (mo == 2 and mon and d >= 15 and d <= 21)
+    hol := hol or (mo == 5 and mon and d >= 25)
+    hol := hol or (y >= 2022 and mo == 6 and (d == 19 or (d == 18 and fri) or (d == 20 and mon)))
+    hol := hol or (mo == 7 and (d == 4 or (d == 3 and fri) or (d == 5 and mon)))
+    hol := hol or (mo == 9 and mon and d <= 7)
+    hol := hol or (mo == 11 and dw == dayofweek.thursday and d >= 22 and d <= 28)
+    hol := hol or (mo == 12 and (d == 24 or d == 25 or d == 26 or d == 31))
+    [em, ed] = f_easter(y)
+    int gf = timestamp("UTC", y, em, ed, 12, 0) - 2 * 86400000
+    hol or (month(gf, "UTC") == mo and dayofmonth(gf, "UTC") == d)
+
+// NFP (approximation): third Friday after the week that contains the 12th of the previous month
+f_isNfp(int y, int mo, int d) =>
+    int ry = mo == 1 ? y - 1 : y
+    int rm = mo == 1 ? 12 : mo - 1
+    int t12 = timestamp("UTC", ry, rm, 12, 12, 0)
+    int sat = 12 + (6 - (dayofweek(t12, "UTC") - 1))
+    int t = timestamp("UTC", ry, rm, sat, 12, 0) + 20 * 86400000
+    if f_isHoliday(year(t, "UTC"), month(t, "UTC"), dayofmonth(t, "UTC"), dayofweek(t, "UTC"))
+        t := t - 86400000
+    bool rule = year(t, "UTC") == y and month(t, "UTC") == mo and dayofmonth(t, "UTC") == d
+    string ds = str.tostring(y) + "-" + (mo < 10 ? "0" : "") + str.tostring(mo) + "-" + (d < 10 ? "0" : "") + str.tostring(d)
+    (rule and ds != "2025-01-03") or ds == "2025-01-10"
+
+FOMC = "2021-01-27 2021-03-17 2021-04-28 2021-06-16 2021-07-28 2021-09-22 2021-11-03 2021-12-15 2022-01-26 2022-03-16 2022-05-04 2022-06-15 2022-07-27 2022-09-21 2022-11-02 2022-12-14 2023-02-01 2023-03-22 2023-05-03 2023-06-14 2023-07-26 2023-09-20 2023-11-01 2023-12-13 2024-01-31 2024-03-20 2024-05-01 2024-06-12 2024-07-31 2024-09-18 2024-11-07 2024-12-18 2025-01-29 2025-03-19 2025-05-07 2025-06-18 2025-07-30 2025-09-17 2025-10-29 2025-12-10 2026-01-28 2026-03-18 2026-04-29 2026-06-17 2026-07-29 2026-09-16 2026-10-28 2026-12-09"
+todayStr = str.format_time(time, "yyyy-MM-dd", "America/New_York")
+nextT = time + (nyW == dayofweek.friday ? 3 : 1) * 86400000
+nextStr = str.format_time(nextT, "yyyy-MM-dd", "America/New_York")
+holToday = f_isHoliday(nyY, nyM, nyD, nyW)
+fomcToday = str.contains(FOMC, todayStr)
+nfpToday = nyW == dayofweek.friday and f_isNfp(nyY, nyM, nyD)
+eveNews = str.contains(FOMC, nextStr) or (dayofweek(nextT, "America/New_York") == dayofweek.friday and f_isNfp(year(nextT, "America/New_York"), month(nextT, "America/New_York"), dayofmonth(nextT, "America/New_York")))
+
+// yesterday's range vs the 10 days before it; Asia (19-24 NY) and London (2-5 NY) ranges
+float prevRange = array.size(ranges) > 0 ? array.get(ranges, array.size(ranges) - 1) : na
+float avgRange = na
+float bigX = 0.0
+if array.size(ranges) >= 4
+    float sm = 0.0
+    int cnt = 0
+    for q = math.max(0, array.size(ranges) - 11) to array.size(ranges) - 2
+        sm += array.get(ranges, q)
+        cnt += 1
+    avgRange := sm / cnt
+    bigX := avgRange > 0 ? prevRange / avgRange : 0.0
+var float asiaH = na
+var float asiaL = na
+var float lonH = na
+var float lonL = na
+var float aftAsiaH = na
+var float aftAsiaL = na
+var float aftLonH = na
+var float aftLonL = na
+var float asiaAvg = na
+var float lonAvg = na
+if ta.change(time("D")) != 0
+    if not na(asiaH)
+        asiaAvg := na(asiaAvg) ? asiaH - asiaL : asiaAvg * 0.9 + (asiaH - asiaL) * 0.1
+    if not na(lonH)
+        lonAvg := na(lonAvg) ? lonH - lonL : lonAvg * 0.9 + (lonH - lonL) * 0.1
+    asiaH := na
+    asiaL := na
+    lonH := na
+    lonL := na
+    aftAsiaH := na
+    aftAsiaL := na
+    aftLonH := na
+    aftLonL := na
+if nyH >= 19
+    asiaH := na(asiaH) ? high : math.max(asiaH, high)
+    asiaL := na(asiaL) ? low : math.min(asiaL, low)
+else if nyH < 17
+    aftAsiaH := na(aftAsiaH) ? high : math.max(aftAsiaH, high)
+    aftAsiaL := na(aftAsiaL) ? low : math.min(aftAsiaL, low)
+    if nyH >= 2 and nyH < 5
+        lonH := na(lonH) ? high : math.max(lonH, high)
+        lonL := na(lonL) ? low : math.min(lonL, low)
+    else if nyH >= 5
+        aftLonH := na(aftLonH) ? high : math.max(aftLonH, high)
+        aftLonL := na(aftLonL) ? low : math.min(aftLonL, low)
+tookH = (not na(pdh) and dayH > pdh) or (not na(asiaH) and not na(aftAsiaH) and aftAsiaH > asiaH) or (not na(lonH) and not na(aftLonH) and aftLonH > lonH)
+tookL = (not na(pdl) and dayL < pdl) or (not na(asiaL) and not na(aftAsiaL) and aftAsiaL < asiaL) or (not na(lonL) and not na(aftLonL) and aftLonL < lonL)
+alBig = not na(asiaAvg) and not na(lonAvg) and not na(asiaH) and not na(lonH) and asiaH - asiaL >= 1.5 * asiaAvg and lonH - lonL >= 1.5 * lonAvg
+
+// HTF (4h) narrative: the last 4h sweep of a swing high closing back below = bearish, and vice versa
+// returns the value as of the previous completed 4h bar (no repainting)
+f_htfBias() =>
+    var int b = 0
+    var float lph = na
+    var float lpl = na
+    int prev = b
+    float ph = ta.pivothigh(high, 2, 2)
+    float pl = ta.pivotlow(low, 2, 2)
+    if not na(lph) and high > lph and close < lph
+        b := -1
+    else if not na(lpl) and low < lpl and close > lpl
+        b := 1
+    if not na(ph)
+        lph := ph
+    if not na(pl)
+        lpl := pl
+    prev
+htfB = request.security(syminfo.tickerid, "240", f_htfBias(), lookahead=barmerge.lookahead_on)
+hi20 = request.security(syminfo.tickerid, "D", ta.highest(high, 20)[1], lookahead=barmerge.lookahead_on)
+lo20 = request.security(syminfo.tickerid, "D", ta.lowest(low, 20)[1], lookahead=barmerge.lookahead_on)
+hi60 = request.security(syminfo.tickerid, "D", ta.highest(high, 60)[1], lookahead=barmerge.lookahead_on)
+lo60 = request.security(syminfo.tickerid, "D", ta.lowest(low, 60)[1], lookahead=barmerge.lookahead_on)
+ieTimeOk = not useIE or ((not isIndex or nyH >= 9.5) and dayTrades < maxDay and dayLosses < maxLoss)
+
+// grade one setup: dir 1 = short, -1 = long; prices real
+f_grade(int dir, float entry, float lbExt, float risk, int strength) =>
+    int fails = 0
+    int warns = 0
+    string notes = ""
+    if holToday
+        fails += 1
+        notes := notes + "✗ Bank holiday\n"
+    if fomcToday or (nfpToday and nyH < 8.6)
+        fails += 1
+        notes := notes + "✗ Red news se pehle (" + (fomcToday ? "FOMC" : "NFP") + ")\n"
+    if bigX >= bigMoveX
+        fails += 1
+        notes := notes + "✗ Kal bara move (" + str.tostring(bigX, "#.0") + "x average)\n"
+    else if bigX >= 1.6
+        warns += 1
+        notes := notes + "! Kal ka range " + str.tostring(bigX, "#.0") + "x average\n"
+    int want = dir == 1 ? -1 : 1
+    if htfB == -want
+        fails += 1
+        notes := notes + "✗ HTF (4h) ulti direction\n"
+    else if htfB != want
+        warns += 1
+        notes := notes + "! HTF (4h) clear nahi\n"
+    if not (dir == 1 ? tookH : tookL)
+        warns += 1
+        notes := notes + (dir == 1 ? "! Aaj ka koi high (PDH/Asia/London) abhi nahi liya\n" : "! Aaj ka koi low (PDL/Asia/London) abhi nahi liya\n")
+    if strength < 24
+        warns += 1
+        notes := notes + "! Chhota high/low sweep hua (asli draw from the left nahi)\n"
+    float frac = not na(avgRange) and avgRange > 0 ? risk / avgRange : 0.0
+    if frac > 0.5
+        fails += 1
+        notes := notes + "✗ Stop bohot bara (day range ka " + str.tostring(100 * frac, "#") + "%)\n"
+    else if frac > 0.3
+        warns += 1
+        notes := notes + "! Stop bara (day range ka " + str.tostring(100 * frac, "#") + "%)\n"
+    bool ext = dir == 1 ? ((not na(lo20) and entry < lo20) or (not na(hi60) and lbExt > hi60)) : ((not na(hi20) and entry > hi20) or (not na(lo60) and lbExt < lo60))
+    if ext
+        warns += 1
+        notes := notes + "! HTF extreme / all-time-high zone\n"
+    if eveNews
+        warns += 1
+        notes := notes + "! Kal FOMC/NFP (aaj liquidity build)\n"
+    if alBig
+        warns += 1
+        notes := notes + "! Asia aur London dono ne bara move kiya\n"
+    string g = fails > 0 ? "X" : warns > 0 ? "B" : "A"
+    [g, notes == "" ? "Saare IE rules theek" : notes]
+f_rank(string g) => g == "A" ? 3 : g == "B" ? 2 : 0
 
 // ---------- swing points (same definition as the app: strict on the left, >= on the right) ----------
 f_isPivotHigh(int kk) =>
@@ -134,6 +347,7 @@ type Setup
     box   riskBox
     box   rewBox
     label tag
+    int   lstr         // how many bars to the left the swept high was the highest (liquidity from the left)
 
 var setups = array.new<Setup>()
 var int wins = 0
@@ -179,6 +393,15 @@ f_tryCreate(int dir, array<int> hiIdx, array<float> hiPx, array<int> loIdx, arra
                     h0 := hp
                     h0i := hi
     Setup s = na
+    int strg = 0
+    if not na(h0)
+        for x = 1 to 300
+            int ago = bar_index - h0i + x
+            if ago > 480
+                break
+            if f_h(dir, ago) >= h0
+                break
+            strg += 1
     if not na(h0)
         // step 1b: displacement within 3 bars after the LB
         bool disp = false
@@ -226,7 +449,7 @@ f_tryCreate(int dir, array<int> hiIdx, array<float> hiPx, array<int> loIdx, arra
                             extBar := bar_index - ago
                     if not dead
                         box b = showForming ? box.new(i, f_real(dir, h1), bar_index + 3, f_real(dir, math.min(h0, bodyTop)), border_color=color.new(#5b8cff, 30), bgcolor=colLB) : na
-                        s := Setup.new(dir, i, h1, entry, sl, lp, bosBar, ext, extBar, 0, false, 0, na, na, na, b, na, na, na)
+                        s := Setup.new(dir, i, h1, entry, sl, lp, bosBar, ext, extBar, 0, false, 0, na, na, na, b, na, na, na, strg)
     s
 
 // update one setup with the current bar; returns true when it is finished
@@ -256,22 +479,25 @@ f_step(Setup s, bool phNew, float phT, int phIdx, bool plNew, float plT, int plI
             if not na(s.lbBox)
                 box.set_right(s.lbBox, bar_index + 3)
             bool ready = not na(s.bosBar) and s.build >= minBuild and (s.resp or not needResp) and bar_index >= s.lbBar + k
-            if ready and h < s.entry and inSess and f_biasOk(dir)
+            if ready and h < s.entry and inSess and f_biasOk(dir) and ieTimeOk
                 float risk = s.sl - s.entry
                 float tp = tpMode == "Fixed R" ? s.entry - fixedR * risk : s.ext
                 bool okTP = tpMode != "Fixed R" or tp >= s.ext
                 float rr = (s.entry - tp) / risk
                 if okTP and rr >= minRR and rr <= maxRR
-                    s.tp := tp
-                    s.rr := rr
-                    s.state := 1
                     float e = f_real(dir, s.entry)
                     float st = f_real(dir, s.sl)
                     float t = f_real(dir, tp)
-                    s.riskBox := box.new(bar_index, st, bar_index + 15, e, border_color=color.new(#ef5350, 40), bgcolor=colRisk)
-                    s.rewBox := box.new(bar_index, e, bar_index + 15, t, border_color=color.new(#26a69a, 40), bgcolor=colRew)
-                    s.tag := label.new(bar_index, e, (dir == 1 ? "SELL" : "BUY") + "  RR 1:" + str.tostring(rr, "#.0"), style=label.style_label_left, color=dir == 1 ? #ef5350 : #26a69a, textcolor=color.white, size=size.small)
-                    alert((dir == 1 ? "Da Vinci SELL " : "Da Vinci BUY ") + syminfo.ticker + " " + timeframe.period + " | Entry " + str.tostring(e, format.mintick) + " | SL " + str.tostring(st, format.mintick) + " | TP " + str.tostring(t, format.mintick) + " | RR 1:" + str.tostring(rr, "#.0"), alert.freq_once_per_bar_close)
+                    [g, why] = f_grade(dir, e, f_real(dir, s.top), risk, s.lstr)
+                    if not useIE or f_rank(g) >= f_rank(ieMin)
+                        s.tp := tp
+                        s.rr := rr
+                        s.state := 1
+                        string gTxt = useIE ? "  " + g : ""
+                        s.riskBox := box.new(bar_index, st, bar_index + 15, e, border_color=color.new(#ef5350, 40), bgcolor=colRisk)
+                        s.rewBox := box.new(bar_index, e, bar_index + 15, t, border_color=color.new(#26a69a, 40), bgcolor=colRew)
+                        s.tag := label.new(bar_index, e, (dir == 1 ? "SELL" : "BUY") + gTxt + "  RR 1:" + str.tostring(rr, "#.0"), style=label.style_label_left, color=dir == 1 ? #ef5350 : #26a69a, textcolor=color.white, size=size.small, tooltip=useIE ? "IE grade " + g + (g == "A" ? " (poora risk)" : g == "B" ? " (aadha risk)" : "") + "\n" + why + "\nT1 par 80% close + stop break-even" : "")
+                        alert((dir == 1 ? "Da Vinci SELL " : "Da Vinci BUY ") + syminfo.ticker + " " + timeframe.period + (useIE ? " | IE " + g : "") + " | Entry " + str.tostring(e, format.mintick) + " | SL " + str.tostring(st, format.mintick) + " | TP " + str.tostring(t, format.mintick) + " | RR 1:" + str.tostring(rr, "#.0"), alert.freq_once_per_bar_close)
     else if s.state == 1
         box.set_right(s.riskBox, bar_index + 5)
         box.set_right(s.rewBox, bar_index + 5)
@@ -326,7 +552,12 @@ if array.size(setups) > 0
         bool plNew = s.dir == 1 ? newPL : newPH
         float plT = s.dir == 1 ? plS : -phS
         if s.lbBar != pIdx or s.state > 0
+            int before = s.state
             bool fin = f_step(s, phNew, phT, pIdx, plNew, plT, pIdx)
+            if before < 2 and s.state >= 2
+                dayTrades += 1
+            if fin and s.state == 3
+                dayLosses += 1
             if fin
                 if s.state == 3
                     losses += 1
@@ -350,7 +581,7 @@ if newPL
 var table tb = table.new(position.top_right, 2, 5, bgcolor=color.new(color.black, 20), border_width=1)
 if showStats and barstate.islast
     int n = wins + losses
-    table.cell(tb, 0, 0, "Da Vinci (this chart)", text_color=color.white, text_size=size.small)
+    table.cell(tb, 0, 0, useIE ? "Da Vinci, IE grade " + ieMin + "+" : "Da Vinci (this chart)", text_color=color.white, text_size=size.small)
     table.cell(tb, 1, 0, "", text_color=color.white)
     table.cell(tb, 0, 1, "Trades", text_color=color.white, text_size=size.small)
     table.cell(tb, 1, 1, str.tostring(n), text_color=color.white, text_size=size.small)

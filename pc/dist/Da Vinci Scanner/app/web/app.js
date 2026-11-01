@@ -1,4 +1,5 @@
 import { Chart, drawEquity, fmt } from './chart.js';
+import { IE_LABELS, IE_GROUPS } from './engine/ierules.js';
 
 const TF_SEC = { '5m': 300, '15m': 900, '30m': 1800, '1h': 3600, '4h': 14400, '1d': 86400 };
 const STATE_TEXT = {
@@ -13,6 +14,14 @@ const STEP_TEXT = [
   ['engineeredLows', 'Lows par liquidity engineer hui'],
   ['entry', 'Entry, SL, TP set (RR ≥ min)'],
 ];
+
+const GRADE_TEXT = { A: 'A · full risk', B: 'B · half risk', X: 'X · IE skip', '?': 'Ban raha hai' };
+const STATE_ICON = { pass: '✓', fail: '✗', warn: '!', wait: '…', info: '·' };
+// USD per 1.0 price move for 1 lot (common CFD contract sizes; brokers differ, check yours)
+const LOT_VALUE = { XAUUSD: 100, EURUSD: 100000, GBPUSD: 100000, NAS100: 1, US30: 1, BTCUSD: 1 };
+
+const USD = new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
+const LOTS = new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 });
 
 const $ = s => document.querySelector(s);
 const store = {
@@ -148,10 +157,12 @@ function showOHLC(c) {
 
 function renderLive() {
   const d = digitsOf(data.market);
-  const live = data.setups.filter(s => s.status === 'pending' || s.status === 'open').reverse();
+  const live = data.setups.filter(s => (s.status === 'pending' || s.status === 'open') && !s.skip).reverse();
+  const skipped = data.setups.filter(s => (s.status === 'pending' || s.status === 'open') && s.skip).slice(-2).reverse();
   const forming = data.setups.filter(s => s.status === 'forming').slice(-2).reverse();
   const card = s => {
-    const steps = STEP_TEXT.map(([k, t]) => `<li class="${s.steps[k] ? 'done' : ''}"><span class="ic" aria-hidden="true">${s.steps[k] ? '✓' : ''}</span><span>${t}${s.steps[k] ? '' : ' <span class="muted">(abhi nahi)</span>'}</span></li>`).join('');
+    const ie = s.ie;
+    const steps = ie ? checklistHTML(s) : STEP_TEXT.map(([k, t]) => `<li class="${s.steps[k] ? 'done' : ''}"><span class="ic" aria-hidden="true">${s.steps[k] ? '✓' : ''}</span><span>${t}${s.steps[k] ? '' : ' <span class="muted">(abhi nahi)</span>'}</span></li>`).join('');
     const lv = s.tp != null
       ? `<dl class="levels" translate="no">
           <div><dt>Entry</dt><dd>${fmt(s.entry, d)}</dd></div>
@@ -160,34 +171,133 @@ function renderLive() {
           <div><dt>RR</dt><dd>1:${(s.rr ?? 0).toFixed(1)}</dd></div>
         </dl>`
       : `<dl class="levels" translate="no"><div><dt>LB zone</dt><dd>${fmt(s.lb.bottom, d)}</dd></div><div><dt>LB extreme</dt><dd>${fmt(s.lb.top, d)}</dd></div></dl>`;
-    return `<article class="setup ${s.status}" aria-label="${s.dir === 'short' ? 'Sell' : 'Buy'} setup">
+    const forming = s.status === 'forming';
+    const grade = !ie ? '' : forming
+      ? `<span class="grade g-wait">Ban raha hai${ie.grade === 'X' ? ' · abhi X' : ''}</span>`
+      : `<span class="grade g-${ie.grade === '?' ? 'wait' : ie.grade}">${GRADE_TEXT[ie.grade] || ie.grade}</span>`;
+    return `<article class="setup ${s.status}${s.skip ? ' skipped' : ''}" aria-label="${s.dir === 'short' ? 'Sell' : 'Buy'} setup">
       <div class="setup-head">
         <span class="side-pill ${s.dir}">${s.dir === 'short' ? 'SELL' : 'BUY'}</span>
         <strong translate="no">${esc(data.market.id)}&nbsp;${esc(data.tf)}</strong>
+        ${grade}
         <span class="state">${STATE_TEXT[s.status] || s.status}</span>
       </div>
       ${lv}
-      <ul class="checks">${steps}</ul>
+      ${s.tp != null && !s.skip ? planHTML(s, d) : ''}
+      ${ie ? steps : `<ul class="checks">${steps}</ul>`}
       <div class="setup-actions">
         <button class="btn-primary" type="button" data-focus="${esc(s.id)}">Chart par dekho</button>
         ${s.tp != null ? `<button class="btn-ghost" type="button" data-copy="${esc(s.id)}">Levels copy</button>` : ''}
+        ${s.tp != null && !s.skip ? `<button class="btn-ghost" type="button" data-journal="${esc(s.id)}">Journal mein likho</button>` : ''}
       </div>
     </article>`;
   };
   let html = live.map(card).join('');
   if (!live.length) html += `<p class="none">Is waqt ${esc(data.market.id)} ${esc(data.tf)} par koi ready setup nahi. Scanner har ${provider.mode === 'pc' ? 'minute' : '~10 minute'} check karta hai.</p>`;
-  if (forming.length) html += `<p class="muted small" style="margin:4px 0 0">Ban rahe setups (abhi trade nahi):</p>` + forming.map(card).join('');
+  if (forming.length) html += `<p class="muted small sub-h">Ban rahe setups (abhi trade nahi):</p>` + forming.map(card).join('');
+  if (skipped.length) html += `<details class="more skipped-list"><summary>IE rules ne ${skipped.length} setup skip kiye (wajah dekho)</summary>${skipped.map(card).join('')}</details>`;
   $('#live').innerHTML = html;
   $('#live').querySelectorAll('[data-focus]').forEach(b => b.addEventListener('click', () => {
     if (!showHistory && !visibleSetups().some(s => s.id === b.dataset.focus)) toggleHistory(true);
     chart.focus(b.dataset.focus);
     $('#chart').scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'center' });
   }));
+  $('#live').querySelectorAll('[data-journal]').forEach(b => b.addEventListener('click', () => {
+    const x = data.setups.find(v => v.id === b.dataset.journal);
+    addJournal({ id: `${data.key}|${x.id}`, t: Math.floor(Date.now() / 1000), market: data.market.id, tf: data.tf, dir: x.dir, entry: x.entry, sl: x.sl, tp: x.tp, rr: x.rr, grade: x.ie?.grade || '', result: '', note: '' });
+  }));
   $('#live').querySelectorAll('[data-copy]').forEach(b => b.addEventListener('click', async () => {
     const s = data.setups.find(x => x.id === b.dataset.copy);
     const txt = `${data.market.id} ${data.tf} ${s.dir === 'short' ? 'SELL' : 'BUY'} | Entry ${fmt(s.entry, d)} | SL ${fmt(s.sl, d)} | TP ${fmt(s.tp, d)} | RR 1:${s.rr.toFixed(1)}`;
     try { await navigator.clipboard.writeText(txt); toast('Levels copy ho gaye'); } catch { toast(txt); }
   }));
+}
+
+function checklistHTML(s) {
+  const by = new Map(s.ie.checks.map(([id, st, note]) => [id, { st, note }]));
+  const bad = s.ie.checks.filter(([, st]) => st === 'fail' || st === 'warn');
+  const ok = s.ie.checks.filter(([, st]) => st === 'pass').length;
+  const row = id => {
+    const c = by.get(id); if (!c) return '';
+    return `<li class="ck ${c.st}"><span class="ic" aria-hidden="true">${STATE_ICON[c.st] || ''}</span><span><span class="sr-only">${c.st}: </span>${esc(IE_LABELS[id] || id)}${c.note ? ` <span class="muted">(${esc(c.note)})</span>` : ''}</span></li>`;
+  };
+  const top = bad.length ? `<ul class="checks">${bad.map(([id]) => row(id)).join('')}</ul>` : '';
+  const groups = IE_GROUPS.map(([g, ids]) => `<li class="grp"><span class="grp-h">${g}</span><ul class="checks">${ids.map(row).join('')}</ul></li>`).join('');
+  return `${top}<details class="more ie-all"><summary>IE checklist: ${ok}/${s.ie.checks.length} rules ✓${bad.length ? ` · ${bad.length} masle` : ''}</summary><ul class="groups">${groups}</ul></details>`;
+}
+
+function planHTML(s, d) {
+  const acct = store.get('acct', { balance: 10000, riskPct: 1 });
+  const share = s.ie ? s.ie.risk : 1;
+  const riskMoney = acct.balance * (acct.riskPct / 100) * share;
+  const dist = Math.abs(s.entry - s.sl);
+  const lv = LOT_VALUE[data.market.id];
+  const lots = lv && dist > 0 ? riskMoney / (dist * lv) : null;
+  const mg = s.ie && s.mgmt ? `<li>T1 <b translate="no">${fmt(s.tp, d)}</b>: 80% close, stop entry par (break-even)</li>
+    ${s.mgmt.beAt != null ? `<li>Agar price <b translate="no">${fmt(s.mgmt.beAt, d)}</b> le le pehle hi: stop break-even</li>` : ''}
+    <li>${s.mgmt.t2 != null ? `Baqi 20% agli liquidity <b translate="no">${fmt(s.mgmt.t2, d)}</b> tak` : 'Baqi 20% target ke baad break-even stop ke saath'}; 4 pm NY (Friday 12) tak band</li>` : '';
+  return `<div class="plan">
+    <p class="small"><strong>Size:</strong> ${share < 1 ? 'B setup, aadha risk: ' : ''}${USD.format(riskMoney)} risk${lots != null ? ` ≈ <b translate="no">${LOTS.format(lots)}</b> lots` : ''} <span class="muted">(account ${USD.format(acct.balance)}, ${acct.riskPct}%; contract size broker se check karo)</span></p>
+    ${mg ? `<ul class="plan-list small">${mg}</ul>` : ''}
+  </div>`;
+}
+
+// ---- discipline + journal (stored on this device) ----
+function journal() { return store.get('journal', []); }
+function addJournal(e) {
+  const j = journal();
+  if (j.some(x => x.id === e.id)) { toast('Ye trade journal mein pehle se hai'); return; }
+  j.push(e); store.set('journal', j.slice(-500));
+  renderDiscipline(); toast('Journal mein add ho gaya. Result baad mein likho.');
+}
+function nyDate(ts) { return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(new Date(ts * 1000)); }
+function renderDiscipline() {
+  const j = journal();
+  const today = nyDate(Date.now() / 1000);
+  const td = j.filter(x => nyDate(x.t) === today);
+  const losses = td.filter(x => x.result === 'loss').length;
+  const weekAgo = Date.now() / 1000 - 7 * 86400;
+  const wk = j.filter(x => x.t >= weekAgo).length;
+  let msg, cls;
+  if (losses >= 2) { msg = 'Aaj 2 losses ho gaye. IE rule: aaj ke liye band. Kal fresh aao.'; cls = 'bad'; }
+  else if (td.length >= 2) { msg = 'Aaj 2 trades ho gayi. IE rule: din mein 2 se zyada nahi.'; cls = 'meh'; }
+  else if (wk > 3) { msg = `Is hafte ${wk} trades. Marco: 1-3 trades per week kaafi hain. Quality over quantity.`; cls = 'meh'; }
+  else { msg = `Aaj ${td.length}/2 trades, ${losses}/2 losses. Is hafte ${wk} trades (target 1-3).`; cls = 'good'; }
+  const v = $('#disc-verdict'); v.textContent = msg; v.className = `verdict ${cls}`;
+  const acct = store.get('acct', { balance: 10000, riskPct: 1 });
+  $('#acct-balance').value = acct.balance; $('#acct-risk').value = acct.riskPct;
+  const rows = j.slice(-12).reverse().map(x => `<tr>
+    <td>${new Date(x.t * 1000).toLocaleDateString(undefined, { day: '2-digit', month: 'short' })}</td>
+    <td translate="no">${esc(x.market)} ${x.dir === 'short' ? 'Sell' : 'Buy'} ${esc(x.grade)}</td>
+    <td><select class="j-res" data-id="${esc(x.id)}" aria-label="Result ${esc(x.market)}" name="res-${esc(x.id)}">
+      ${['', 'win', 'loss', 'be', 'skipped'].map(o => `<option value="${o}" ${x.result === o ? 'selected' : ''}>${{ '': 'Result…', win: 'Win', loss: 'Loss', be: 'Break-even', skipped: 'Nahi li' }[o]}</option>`).join('')}
+    </select></td>
+    <td><input class="j-note" data-id="${esc(x.id)}" name="note-${esc(x.id)}" value="${esc(x.note || '')}" placeholder="Note / feeling…" aria-label="Note" autocomplete="off"></td></tr>`).join('');
+  $('#journal tbody').innerHTML = rows || '<tr><td colspan="4" class="muted">Abhi koi entry nahi. Setup card par "Journal mein likho" dabao.</td></tr>';
+  const upd = (id, k, val) => { const all = journal(); const e = all.find(z => z.id === id); if (e) { e[k] = val; store.set('journal', all); } };
+  $('#journal').querySelectorAll('.j-res').forEach(el => el.addEventListener('change', () => { upd(el.dataset.id, 'result', el.value); renderDiscipline(); }));
+  $('#journal').querySelectorAll('.j-note').forEach(el => el.addEventListener('change', () => upd(el.dataset.id, 'note', el.value)));
+}
+function setupDiscipline() {
+  const save = () => {
+    const balance = Math.max(0, +$('#acct-balance').value || 0), riskPct = Math.min(5, Math.max(0.05, +$('#acct-risk').value || 1));
+    store.set('acct', { balance, riskPct });
+    $('#acct-balance').value = balance; $('#acct-risk').value = riskPct;   // show the value actually used
+    if (data) renderLive();
+  };
+  $('#acct-balance').addEventListener('change', save);
+  $('#acct-risk').addEventListener('change', save);
+  $('#journal-csv').addEventListener('click', () => {
+    const j = journal();
+    const head = 'date,market,tf,side,grade,entry,sl,tp,rr,result,note';
+    const q = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const csv = [head, ...j.map(x => [new Date(x.t * 1000).toISOString().slice(0, 16), x.market, x.tf, x.dir, x.grade, x.entry, x.sl, x.tp, x.rr, x.result, x.note].map(q).join(','))].join('\n');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+    a.download = 'davinci-journal.csv'; a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  });
+  renderDiscipline();
 }
 
 function renderBacktest() {
@@ -295,6 +405,7 @@ window.addEventListener('hashchange', () => {
 });
 document.addEventListener('visibilitychange', () => { if (!document.hidden) loadIndex(); });
 setupNotifyButton();
+setupDiscipline();
 if (provider.setupSettings) provider.setupSettings({ toast, reload: () => { data = null; loadIndex(); } });
 loadIndex();
 setInterval(loadIndex, provider.mode === 'pc' ? 30_000 : 60_000);

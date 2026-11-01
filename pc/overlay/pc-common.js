@@ -1,18 +1,25 @@
 // Shared by the PC app window (pc-provider.js) and the background scanner (worker.js).
 import { buildReport } from './engine/report.js';
+import { liveEvents } from './engine/calendar.js';
+import { IE_LABELS } from './engine/ierules.js';
 
 export const MARKETS = {
-  XAUUSD: { id: 'XAUUSD', name: 'Gold', yahoo: 'GC=F', digits: 2, spread: 0.3 },
-  NAS100: { id: 'NAS100', name: 'Nasdaq 100', yahoo: 'NQ=F', digits: 1, spread: 1.5 },
-  US30: { id: 'US30', name: 'Dow Jones', yahoo: 'YM=F', digits: 0, spread: 2.5 },
-  EURUSD: { id: 'EURUSD', name: 'Euro / Dollar', yahoo: 'EURUSD=X', digits: 5, spread: 0.00008 },
-  GBPUSD: { id: 'GBPUSD', name: 'Pound / Dollar', yahoo: 'GBPUSD=X', digits: 5, spread: 0.00012 },
-  BTCUSD: { id: 'BTCUSD', name: 'Bitcoin', yahoo: 'BTC-USD', digits: 0, spread: 15 },
+  XAUUSD: { id: 'XAUUSD', name: 'Gold', yahoo: 'GC=F', digits: 2, spread: 0.3, kind: 'metal', ccy: ['USD'] },
+  NAS100: { id: 'NAS100', name: 'Nasdaq 100', yahoo: 'NQ=F', digits: 1, spread: 1.5, kind: 'index', ccy: ['USD'] },
+  US30: { id: 'US30', name: 'Dow Jones', yahoo: 'YM=F', digits: 0, spread: 2.5, kind: 'index', ccy: ['USD'] },
+  EURUSD: { id: 'EURUSD', name: 'Euro / Dollar', yahoo: 'EURUSD=X', digits: 5, spread: 0.00008, kind: 'fx', ccy: ['USD', 'EUR'] },
+  GBPUSD: { id: 'GBPUSD', name: 'Pound / Dollar', yahoo: 'GBPUSD=X', digits: 5, spread: 0.00012, kind: 'fx', ccy: ['USD', 'GBP'] },
+  BTCUSD: { id: 'BTCUSD', name: 'Bitcoin', yahoo: 'BTC-USD', digits: 0, spread: 15, kind: 'fx', ccy: ['USD'] },
 };
 
-// Rule presets. "session" follows the case studies (New York morning, session liquidity);
-// "classic" is the plain 4-step Da Vinci on any hour.
+// Rule presets. "ie" = the full Inter Equity rulebook compiled from all 155 videos (checklist,
+// A/B grades, IE management, 2 trades / 2 losses a day). "session" follows the case studies
+// (New York morning, session liquidity); "classic" is the plain 4-step Da Vinci on any hour.
 export const STRATEGIES = {
+  ie: {
+    label: 'Inter Equity full rulebook (20 rules, A/B grade, IE management)',
+    params: { pivotK: 3, entryMode: 'level', tpMode: 'liquidity', minRR: 3, slBufferATR: 0.3, minRiskATR: 0.5, costR: 0.02, session: [8, 11], ie: true, ieMin: 'B', manage: 'ie', maxTradesPerDay: 2, maxLossesPerDay: 2 },
+  },
   session: {
     label: 'New York session + session levels + daily bias (case studies)',
     params: { pivotK: 3, entryMode: 'level', tpMode: 'liquidity', minRR: 3, slBufferATR: 0.3, minRiskATR: 0.5, costR: 0.02, session: [8, 11], refLevels: true, bias: 'daily' },
@@ -30,7 +37,8 @@ export const STRATEGIES = {
 export const DEFAULT_CONFIG = {
   markets: ['XAUUSD', 'NAS100', 'US30'],
   timeframes: ['5m', '15m'],
-  strategy: 'session',
+  strategy: 'ie',
+  rulesVersion: 2,
   requireEdge: true,
   telegram: { token: '', chat: '' },
   autoStart: false,
@@ -45,7 +53,9 @@ export async function getConfig() {
   try {
     const r = await fetch('/api/config', { cache: 'no-store' });
     const c = await r.json();
-    return { ...DEFAULT_CONFIG, ...c, telegram: { ...DEFAULT_CONFIG.telegram, ...(c.telegram || {}) } };
+    // first start after the rulebook update: switch to the full Inter Equity rules once
+    if ((c.rulesVersion || 1) < 2) c.strategy = 'ie';
+    return { ...DEFAULT_CONFIG, ...c, rulesVersion: 2, telegram: { ...DEFAULT_CONFIG.telegram, ...(c.telegram || {}) } };
   } catch { return { ...DEFAULT_CONFIG }; }
 }
 
@@ -75,14 +85,28 @@ export async function getCandles(market, tf) {
   return out;
 }
 
+// This week's red-folder news (ForexFactory weekly export, fetched by the local server, cached 1 hour).
+let news = { at: 0, feed: null };
+export async function getNews() {
+  if (Date.now() - news.at < 3600_000 && news.feed) return news.feed;
+  try {
+    const r = await fetch('/api/news', { cache: 'no-store' });
+    const j = r.ok ? await r.json() : null;
+    news = { at: Date.now(), feed: Array.isArray(j) && j.length ? j : null };
+  } catch { news = { at: Date.now(), feed: null }; }
+  return news.feed;
+}
+
 const cache = new Map();
 /** Report for one market/timeframe; rebuilt only when a new candle has closed. */
 export async function marketReport(cfg, id, tf, { full = false } = {}) {
   const market = MARKETS[id];
-  const params = (STRATEGIES[cfg.strategy] || STRATEGIES.session).params;
+  const base = (STRATEGIES[cfg.strategy] || STRATEGIES.ie).params;
+  const feed = base.ie ? await getNews() : null;
+  const params = { ...base, kind: market.kind || 'fx', ieParams: { live: feed ? liveEvents(feed, market.ccy || ['USD']) : null } };
   const candles = await getCandles(market, tf);
   if (candles.length < 200) throw new Error(`only ${candles.length} candles`);
-  const key = `${id}_${tf}|${cfg.strategy}|${full}`;
+  const key = `${id}_${tf}|${cfg.strategy}|${full}|${news.at}`;
   const last = candles[candles.length - 1].t;
   const hit = cache.get(key);
   if (hit && hit.last === last) return hit.report;
@@ -95,15 +119,20 @@ export function alertText(report, s) {
   const d = (report.market.digits ?? 2);
   const f = v => Number(v).toFixed(d);
   const a = report.backtest.all, o = report.backtest.outOfSample;
+  const g = s.ie?.grade;
+  const issues = (s.ie?.checks || []).filter(c => c[1] === 'warn' || c[1] === 'fail').map(c => `${c[1] === 'fail' ? '✗' : '⚠️'} ${IE_LABELS[c[0]] || c[0]}${c[2] ? ' (' + c[2] + ')' : ''}`);
   return {
-    title: `${s.dir === 'short' ? 'SELL' : 'BUY'} ${report.market.id} ${report.tf} · RR 1:${(s.rr ?? 0).toFixed(1)}`,
+    title: `${s.dir === 'short' ? 'SELL' : 'BUY'} ${report.market.id} ${report.tf}${g ? ' · IE ' + g : ''} · RR 1:${(s.rr ?? 0).toFixed(1)}`,
     body: `Entry ${f(s.entry)} · SL ${f(s.sl)} · TP ${f(s.tp)}`,
     text: [
-      `<b>${s.dir === 'short' ? '🔴 SELL' : '🟢 BUY'} — ${report.market.id} ${report.tf} — Da Vinci</b>`,
+      `<b>${s.dir === 'short' ? '🔴 SELL' : '🟢 BUY'} — ${report.market.id} ${report.tf} — Da Vinci${g ? ` — IE grade ${g}` : ''}</b>`,
+      g ? (g === 'A' ? 'Saare IE rules theek: poora risk' : 'Core rules theek, kuch warning: aadha risk') : null,
       s.status === 'open' ? 'Entry ho chuki (trade open)' : 'Limit order: price abhi entry tak nahi aayi',
-      '', `Entry: <b>${f(s.entry)}</b>`, `Stop loss: <b>${f(s.sl)}</b>`, `Target: <b>${f(s.tp)}</b>`, `RR: <b>1:${(s.rr ?? 0).toFixed(1)}</b>`, '',
+      '', `Entry: <b>${f(s.entry)}</b>`, `Stop loss: <b>${f(s.sl)}</b>`, `Target (80% yahan): <b>${f(s.tp)}</b>`, `RR: <b>1:${(s.rr ?? 0).toFixed(1)}</b>`,
+      s.mgmt?.t2 != null ? `Runner (20%): ${f(s.mgmt.t2)}` : null,
+      ...issues, '',
       `Backtest: ${a.trades} trades, win ${Math.round(a.winRate * 100)}%, ${a.expectancyR.toFixed(2)}R/trade (unseen data ${o.expectancyR.toFixed(2)}R)`,
       '<i>Ye financial advice nahi. Har trade loss ho sakti hai.</i>',
-    ].join('\n'),
+    ].filter(x => x !== null).join('\n'),
   };
 }

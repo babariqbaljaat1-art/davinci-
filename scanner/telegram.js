@@ -1,4 +1,5 @@
 // Telegram alerts. Needs repository secrets TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID.
+import { IE_LABELS } from '../docs/engine/ierules.js';
 const fmt = (v, d) => (v == null ? '-' : Number(v).toFixed(d));
 const pct = v => `${Math.round((v || 0) * 100)}%`;
 
@@ -18,14 +19,19 @@ export function setupMessage(m, tf, s, bt, appUrl) {
   const side = s.dir === 'short' ? '🔴 SELL' : '🟢 BUY';
   const state = s.status === 'open' ? 'Entry trigger ho chuki (trade open)' : 'Limit order: price abhi entry tak nahi aayi';
   const a = bt.all, o = bt.outOfSample, mc = bt.monteCarlo;
+  const g = s.ie?.grade;
+  const issues = (s.ie?.checks || []).filter(c => c[1] === 'warn').map(c => `⚠️ ${IE_LABELS[c[0]] || c[0]}${c[2] ? ' (' + c[2] + ')' : ''}`);
   return [
-    `<b>${side} — ${m.id} ${tf} — Da Vinci</b>`,
+    `<b>${side} — ${m.id} ${tf} — Da Vinci${g ? ` — IE grade ${g}` : ''}</b>`,
+    g ? (g === 'A' ? 'Saare IE rules theek: poora risk' : 'Core rules theek, kuch warning: aadha risk') : '',
     state,
     ``,
     `Entry: <b>${fmt(s.entry, d)}</b>`,
     `Stop loss: <b>${fmt(s.sl, d)}</b>`,
     `Target: <b>${fmt(s.tp, d)}</b>`,
     `RR: <b>1:${fmt(s.rr, 1)}</b>`,
+    s.mgmt?.t2 != null ? `Runner (20%): ${fmt(s.mgmt.t2, d)}` : '',
+    ...issues,
     ``,
     `Backtest (${m.id} ${tf}): ${a.trades} trades, win ${pct(a.winRate)}, avg ${fmt(a.expectancyR, 2)}R/trade`,
     `Out-of-sample: ${o.trades} trades, ${fmt(o.expectancyR, 2)}R/trade`,

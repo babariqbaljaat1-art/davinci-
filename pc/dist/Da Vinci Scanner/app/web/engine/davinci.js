@@ -17,6 +17,7 @@
 // or the setup takes too long.
 
 import { atr, pivots, simulateTrade, resample, nyClock, referenceLevels, periodBias } from './core.js';
+import { gradeSetups, GRADE_RANK } from './ierules.js';
 
 export const DEFAULTS = {
   pivotK: 3,              // swing strength (bars each side)
@@ -45,6 +46,14 @@ export const DEFAULTS = {
   refLevels: false,       // true = the LB must sweep a session level (prev day / Asia / London high or low)
   lbSession: null,        // e.g. [8, 11] = the LB sweep itself must form in New York hours (case studies: after the 8:30 news)
   htfFactor: 4,           // HTF = this many base bars (e.g. 1h -> 4h)
+  ie: false,              // true = grade every setup against the Inter Equity rulebook (ierules.js)
+  ieMin: 'B',             // with ie: setups below this grade are marked skip (not traded, not alerted)
+  kind: 'fx',             // 'fx' | 'metal' | 'index' (indices: entries only after the 9:30 open)
+  manage: 'simple',       // 'simple' = full size to target | 'ie' = partial at the first target, BE, runner, time exit
+  t1Pct: 0.8,             // ie management: share closed at the first target (webinars: 78-90%)
+  t1R: 0,                 // ie management: >0 = first target at this R (runner to the liquidity); 0 = first target is the liquidity
+  closeHour: 16,          // ie management: close whatever is left at this New York hour (Friday: 12)
+  maxLossesPerDay: 0,     // >0: stop for the day after this many losses (live calls: 2)
 };
 
 // --- mirroring: run the bearish logic on flipped prices to get bullish setups ---
@@ -145,6 +154,8 @@ function detectBearish(c, p, A, piv, refs, hours) {
       }
     }
     if (!H0) continue;
+    let strength = 0;                                          // how far left the swept high is the highest point
+    for (let x = H0.i - 1; x >= 0 && strength < 500 && c[x].h < H0.price; x--) strength++;
 
     // Step 1b: displacement after the LB high
     let dispAt = -1;
@@ -224,7 +235,8 @@ function detectBearish(c, p, A, piv, refs, hours) {
 
     const base = {
       lb: { i, t: c[i].t, top, bottom: Math.min(level, bodyTop), level },
-      swept: { i: H0.i, t: c[H0.i].t, price: H0.price },
+      swept: { i: H0.i, t: c[H0.i].t, price: H0.price, kind: H0.kind || null, strength },
+      disp: dispAt >= 0,
       bos, buildup: buildup.map(h => ({ i: h.i, t: c[h.i].t, price: h.price })),
       respected: respected ? { i: respected.i, t: c[respected.i].t, price: respected.price } : null,
       extreme: Number.isFinite(extreme.price) ? { i: extreme.i, t: c[extreme.i].t, price: extreme.price } : null,
@@ -241,7 +253,23 @@ function detectBearish(c, p, A, piv, refs, hours) {
       expiresAt = Math.min(expiresAt, e);
     }
     const s = { ...base, tp: armed.tp, rr: armed.rr, armedAt: armed.at, expiresAt, status: 'armed' };
-    s.result = simulateTrade(c, { dir: 'short', entry: s.entry, sl: s.sl, tp: s.tp, armedAt: s.armedAt, expiresAt: s.expiresAt }, { costR: p.costR + (p.spread || 0) / Math.abs(s.sl - s.entry), maxBarsInTrade: p.maxBarsInTrade, partialR: p.partialR, partialPct: p.partialPct });
+    // management levels known at arming: the next intact low below entry (>= 1R away) -> break-even
+    // once taken ("entry became an inducement point"); the next intact low beyond the target -> runner
+    const risk = s.sl - s.entry;
+    let beAt = null, t2 = null;
+    for (const l of lows) {
+      if (l.confirmedAt > armed.at) break;
+      if (l.i < i - p.sweepLookback) continue;
+      let intact = true;
+      for (let x = l.i + 1; x < armed.at; x++) if (c[x].l < l.price) { intact = false; break; }
+      if (!intact) continue;
+      if (l.i > i && l.price < s.entry - risk && l.price > s.tp && (beAt == null || l.price > beAt)) beAt = l.price;
+      if (l.price < s.tp - 0.05 * atrI && (t2 == null || l.price > t2)) t2 = l.price;
+    }
+    s.mgmt = { beAt, t2 };
+    s.result = simulateTrade(c, { dir: 'short', entry: s.entry, sl: s.sl, tp: s.tp, armedAt: s.armedAt, expiresAt: s.expiresAt },
+      { costR: p.costR + (p.spread || 0) / Math.abs(s.sl - s.entry), maxBarsInTrade: p.maxBarsInTrade, partialR: p.partialR, partialPct: p.partialPct,
+        manage: p.manage, t1Pct: p.t1Pct, t1R: p.t1R, beAt, t2, closeHour: p.closeHour });
     s.status = s.result.status;
     setups.push(s);
   }
@@ -257,6 +285,7 @@ function unmirror(s) {
     swept: pt(s.swept), bos: pt(s.bos), respected: pt(s.respected), extreme: pt(s.extreme),
     buildup: s.buildup.map(pt),
     entry: f(s.entry), sl: f(s.sl), tp: f(s.tp),
+    mgmt: s.mgmt ? { beAt: f(s.mgmt.beAt), t2: f(s.mgmt.t2) } : s.mgmt,
     result: s.result ? { ...s.result, exit: f(s.result.exit), mark: f(s.result.mark) } : s.result,
   };
 }
@@ -272,6 +301,7 @@ export function findSetups(candles, params = {}) {
   const A = atr(candles, 14);
   const bias = p.bias === 'htf' ? htfBias(candles, p.htfFactor) : (p.bias === 'daily' || p.bias === 'weekly') ? periodBias(candles, p.bias) : null;
 
+  if (p.ie && p.kind === 'index' && p.session) p.session = [Math.max(p.session[0], 9.5), p.session[1]];   // stock open = red-folder event
   const hours = p.session ? candles.map(c => nyClock(c.t).hour) : null;
   let refsBear = null, refsBull = null;
   if (p.refLevels) {
@@ -297,27 +327,36 @@ export function findSetups(candles, params = {}) {
     });
   }
   for (const s of all) s.id = `${s.dir}-${s.lb.t}`;
-  return all.sort((a, b) => a.lb.i - b.lb.i);
+  all.sort((a, b) => a.lb.i - b.lb.i);
+  if (p.ie) {
+    // grade what can still be traded or was traded; expired/invalid setups need no checklist
+    gradeSetups(candles, all.filter(s => s.armedAt != null || s.status === 'forming'), { ...p, ...(p.ieParams || {}), sessionStart: p.session ? p.session[0] : 8, sessionEnd: p.session ? p.session[1] : 11 });
+    const min = GRADE_RANK[p.ieMin] ?? GRADE_RANK.B;
+    for (const s of all) if (s.armedAt != null && GRADE_RANK[s.ie.grade] < min) s.skip = true;
+  }
+  return all;
 }
 
 /**
  * Backtest = every armed setup, taking only one trade at a time
  * (a setup that fills while another trade is open is skipped).
  */
-export function tradesFromSetups(setups, { candles = null, maxPerDay = 0 } = {}) {
+export function tradesFromSetups(setups, { candles = null, maxPerDay = 0, maxLossesPerDay = 0 } = {}) {
   const done = setups
-    .filter(s => s.result && ['win', 'loss', 'timeout', 'open'].includes(s.result.status))
+    .filter(s => !s.skip && s.result && ['win', 'loss', 'timeout', 'open'].includes(s.result.status))
     .sort((a, b) => a.result.fillAt - b.result.fillAt);
   const taken = [];
-  const perDay = new Map();
+  const perDay = new Map(), lossDay = new Map();
   let busyUntil = -1;
   for (const s of done) {
     if (s.result.fillAt <= busyUntil) continue;
-    if (maxPerDay > 0 && candles) {
+    if ((maxPerDay > 0 || maxLossesPerDay > 0) && candles) {
       const day = nyClock(candles[s.result.fillAt].t).tradeDay;
       const n = perDay.get(day) || 0;
-      if (n >= maxPerDay) continue;
+      if (maxPerDay > 0 && n >= maxPerDay) continue;
+      if (maxLossesPerDay > 0 && (lossDay.get(day) || 0) >= maxLossesPerDay) continue;   // "two losses in a day and I'm done"
       perDay.set(day, n + 1);
+      if (s.result.r <= 0 && s.result.status !== 'open') lossDay.set(day, (lossDay.get(day) || 0) + 1);
     }
     taken.push(s);
     busyUntil = s.result.exitAt ?? Infinity;

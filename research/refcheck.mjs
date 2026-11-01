@@ -29,13 +29,16 @@ const ny = t => { const k = nyClock(t), h = Math.floor(k.hour + 1e-9), m = Math.
 
 for (const [id, day, time, dir, entry, sl, tp, src] of REFS) {
   const all = load(id); if (!all) { console.log(`\n${src} ${id} ${day}: no data`); continue; }
-  const t0 = Date.parse(day + 'T00:00:00Z') / 1000 - 5 * 86400, t1 = t0 + 7 * 86400;
+  const t0 = Date.parse(day + 'T00:00:00Z') / 1000 - (process.env.EXTRA?.includes('"ie"') ? 40 : 5) * 86400, t1 = Date.parse(day + 'T00:00:00Z') / 1000 + 2 * 86400;
   const c = all.filter(x => x.t >= t0 && x.t < t1);
   console.log(`\n=== ${src}: ${id} ${day} ${time} NY ${dir} entry ${entry} sl ${sl} tp ${tp} (RR ${(Math.abs(tp - entry) / Math.abs(sl - entry)).toFixed(1)})`);
   const show = (name, list, cc) => {
     const hits = list.filter(s => s.armedAt != null && nyClock(cc[s.armedAt].t).tradeDay === nyClock(Date.parse(day + 'T16:00:00Z') / 1000).tradeDay);
     if (!hits.length) { console.log(`  ${name}: nothing armed that day`); return; }
-    for (const s of hits) console.log(`  ${name}: ${s.dir} armed ${ny(cc[s.armedAt].t)} entry ${+s.entry.toFixed(5)} sl ${+s.sl.toFixed(5)} tp ${+s.tp.toFixed(5)} RR ${s.rr.toFixed(1)} -> ${s.result?.status}${s.result?.fillAt != null ? ' fill ' + ny(cc[s.result.fillAt].t) : ''}`);
+    for (const s of hits) {
+      const ie = s.ie ? ` [IE ${s.ie.grade}${s.ie.checks.filter(x => x.state === 'fail' || x.state === 'warn').map(x => ' ' + x.id + (x.state === 'fail' ? '✗' : '!')).join('')}]` : '';
+      console.log(`  ${name}: ${s.dir} armed ${ny(cc[s.armedAt].t)} entry ${+s.entry.toFixed(5)} sl ${+s.sl.toFixed(5)} tp ${+s.tp.toFixed(5)} RR ${s.rr.toFixed(1)} -> ${s.result?.status}${s.result?.fillAt != null ? ' fill ' + ny(cc[s.result.fillAt].t) : ''}${ie}`);
+    }
   };
   const full = load5(id), d5 = full ? full.filter(x => x.t >= t0 && x.t < t1) : [];
   const has1m = c.some(x => nyClock(x.t).date === day);
