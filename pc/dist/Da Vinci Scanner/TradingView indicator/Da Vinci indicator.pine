@@ -31,9 +31,9 @@ fixedR     = input.float(3.0, "Fixed R target", minval=1, step=0.5, group=grpT)
 minRR      = input.float(3.0, "Minimum RR", minval=1, step=0.5, group=grpT)
 maxRR      = input.float(20.0, "Maximum RR", minval=2, step=1, group=grpT)
 costR      = input.float(0.05, "Cost per trade (R) for stats", minval=0, step=0.01, group=grpT)
-grpS = "Session filter (exchange time of the chart)"
+grpS = "Session filter (New York time)"
 useSess    = input.bool(true, "Only arm setups inside the session", group=grpS)
-sess       = input.session("0800-1100", "Session (New York morning on NY-time charts)", group=grpS)
+sess       = input.session("0800-1100", "Session, New York time (8-11 = NY morning)", group=grpS)
 useBias    = input.bool(true, "Daily bias: buys only after the previous day low is taken, sells after the high", group=grpS)
 grpV = "Display"
 showForming = input.bool(true, "Show forming setups (LB only)", group=grpV)
@@ -43,7 +43,7 @@ colRisk = input.color(color.new(#ef5350, 80), "Stop zone", group=grpV)
 colRew  = input.color(color.new(#26a69a, 80), "Target zone", group=grpV)
 
 atr = ta.atr(14)
-inSess = not useSess or not na(time(timeframe.period, sess))
+inSess = not useSess or not na(time(timeframe.period, sess, "America/New_York"))
 
 // daily bias: the last side of the previous day's range that price took
 var float dayH = na

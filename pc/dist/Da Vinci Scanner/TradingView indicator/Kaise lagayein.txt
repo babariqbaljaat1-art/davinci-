@@ -25,7 +25,8 @@ Jab bhi setup arm hoga, phone par entry/SL/TP ke saath alert aayega.
 Settings
 --------
 - "Session filter": case studies New York session (subah 8-11 New York time) par focus karti hain.
-  Session waqt chart ke exchange time mein hota hai. OANDA forex/gold ke liye New York time hi hai.
+  Session hamesha New York time mein hai (kisi bhi broker ke chart par), Pakistan time mein taqreeban
+  shaam 6-9 baje (sardiyon mein), garmiyon mein 5-8 baje.
 - "Entry", "Stop buffer", "Target", "Minimum RR": PC app jaisi settings.
 
 Ye educational tool hai, financial advice nahi. Table mein negative R ho to us chart par is par trade mat karo.

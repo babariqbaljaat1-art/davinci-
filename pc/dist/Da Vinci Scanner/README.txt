@@ -21,7 +21,8 @@ SETTINGS (upar gear icon)
 -------------------------
 - Markets: XAUUSD, NAS100, US30, EURUSD, GBPUSD, BTCUSD
 - Timeframes: 5m, 15m, 1h
-- Rules: "New York session" (case studies wala tareeqa) ya "Classic" (har waqt)
+- Rules: "New York session + session levels + daily bias" (case studies wala tareeqa),
+  "New York session only", ya "Classic" (har waqt)
 - "Alert sirf tab jab backtest positive ho": ON rakhna behtar hai
 - "Windows start hote hi scanner chalao": PC on hote hi tray mein chal jaye
 - Telegram: @BotFather se bot banao, token yahan daalo; bot ko "hi" bhejo, phir
@@ -32,6 +33,10 @@ IMAANDAARI WALI BAATEIN
 -----------------------
 - Data Yahoo Finance se aata hai: gold aur indices futures ~10 minute delayed hote hain, forex taqreeban live.
   Broker (OANDA wagaira) ki prices thodi alag hoti hain.
+- 4 saal (Nov 2022 - Oct 2026) ke 5m data par 5 markets mein 192 settings test ki gayi (2.2 lakh trades,
+  spread ke saath). Koi bhi setting pehle 70% aur baad ke 30% data, dono par positive nahi rahi.
+  Isi liye "Alert sirf tab jab backtest positive ho" shuru se ON hai: alert tabhi aata hai jab
+  us market par rules waqai kaam kar rahe hon. Is wajah se alerts kam (ya bilkul nahi) aa sakte hain.
 - Backtest panel batata hai ke rules us market/timeframe par kaam kar rahe hain ya nahi. Negative ho to us par trade mat karo.
 - Ye educational tool hai, financial advice nahi. Pehle demo account par test karo.
 
