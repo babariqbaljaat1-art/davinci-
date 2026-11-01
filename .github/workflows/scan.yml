@@ -10,7 +10,7 @@ on:
     branches: [main]
 
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 
@@ -49,13 +49,19 @@ jobs:
           TWELVEDATA_API_KEY: ${{ secrets.TWELVEDATA_API_KEY }}
           SAVE_RAW: ${{ github.event_name != 'schedule' && '1' || '' }}
 
-      # raw candles for research (manual / push runs only)
+      # raw candles for research (manual / push runs only), kept on a separate branch
       - if: github.event_name != 'schedule'
-        uses: actions/upload-artifact@v4
-        with:
-          name: raw-candles
-          path: raw/
-          retention-days: 3
+        name: Save raw candles to the raw-data branch
+        run: |
+          cd raw
+          git init -q -b raw-data
+          git config user.name davinci-bot
+          git config user.email actions@users.noreply.github.com
+          git add -A
+          git commit -q -m "raw candles $(date -u +%FT%TZ)"
+          git push -f -q "https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}" raw-data
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
