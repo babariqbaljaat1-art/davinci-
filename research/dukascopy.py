@@ -1,6 +1,6 @@
 """Download Dukascopy M1 bid candles and save 5-minute candles (research data).
 
-Runs on GitHub Actions (free). Output: duka/<SYMBOL>_5m.json.gz with rows [t, o, h, l, c]
+Runs on GitHub Actions (free). Output: duka/<SYMBOL>_5m.json.gz and duka/<SYMBOL>_1m.json.gz, rows [t, o, h, l, c]
 (t = unix seconds, UTC). Usage: python research/dukascopy.py 2023-01-01 2026-10-31
 """
 import gzip, json, lzma, os, struct, sys, time, urllib.request
@@ -78,6 +78,9 @@ def main():
             else:
                 cur[2] = max(cur[2], h); cur[3] = min(cur[3], l); cur[4] = c
         if cur: out.append(cur)
+        # the case studies enter on the 1-minute chart, so keep the 1-minute candles as well
+        with gzip.open(f'{OUT}/{sid}_1m.json.gz', 'wt') as f:
+            json.dump([[r[0]] + [round(x / scale, 6) for x in r[1:]] for r in m1], f, separators=(',', ':'))
         rows = [[r[0]] + [round(x / scale, 6) for x in r[1:]] for r in out]
         with gzip.open(f'{OUT}/{sid}_5m.json.gz', 'wt') as f:
             json.dump(rows, f, separators=(',', ':'))
