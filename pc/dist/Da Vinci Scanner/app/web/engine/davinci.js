@@ -43,6 +43,7 @@ export const DEFAULTS = {
   bias: 'none',           // 'none' | 'htf' | 'daily' | 'weekly' (direction from the last prev-day/week high-low sweep)
   session: null,          // e.g. [8, 11] = only arm/fill between 08:00 and 11:00 New York time
   refLevels: false,       // true = the LB must sweep a session level (prev day / Asia / London high or low)
+  lbSession: null,        // e.g. [8, 11] = the LB sweep itself must form in New York hours (case studies: after the 8:30 news)
   htfFactor: 4,           // HTF = this many base bars (e.g. 1h -> 4h)
 };
 
@@ -91,6 +92,7 @@ function firstAfter(list, i) {
 
 /** Core bearish detector on (possibly mirrored) candles. */
 function detectBearish(c, p, A, piv, refs, hours) {
+  const lbHours = p.lbSession ? (hours || c.map(x => nyClock(x.t).hour)) : null;
   const { highs, lows } = piv;
   const n = c.length;
   const setups = [];
@@ -109,6 +111,7 @@ function detectBearish(c, p, A, piv, refs, hours) {
     if (i + p.pivotK >= n) continue;
     const atrI = A[i];
     if (!(atrI > 0)) continue;
+    if (lbHours && !(lbHours[i] >= p.lbSession[0] && lbHours[i] < p.lbSession[1])) continue;   // the sweep itself must happen in the session
 
     // Step 1a: which intact swing high did H1 run?
     let H0 = null;
@@ -320,4 +323,65 @@ export function tradesFromSetups(setups, { candles = null, maxPerDay = 0 } = {})
     busyUntil = s.result.exitAt ?? Infinity;
   }
   return taken;
+}
+
+/**
+ * Confirmation entry (course "Entries" lesson and the case studies): the Da Vinci on a higher
+ * timeframe (5m by default) gives the zone and the target; the entry comes from the same pattern
+ * on the 1-minute chart once price is inside that zone ("wait for the buyers to get trapped"),
+ * with the stop just beyond the 1-minute liquidity block. Same output shape as findSetups,
+ * indices refer to the 1-minute candles.
+ */
+export function findSetupsMTF(c1, params = {}) {
+  const p = { ...DEFAULTS, htfSeconds: 300, ltfPivotK: 2, ltfEntryMode: 'level', ltfSlBufferATR: 0.1, ltfMaxBars: 60, zoneBufferATR: 0.25, ...params };
+  if (c1.length < 500) return [];
+  const ch = resample(c1, p.htfSeconds);
+  const htf = findSetups(ch, { ...p, partialR: 0 }).filter(s => s.armedAt != null);
+  const ltf = findSetups(c1, {
+    pivotK: p.ltfPivotK, entryMode: p.ltfEntryMode, slBufferATR: p.ltfSlBufferATR, minRiskATR: 0,
+    minBuildup: 0, requireRespectedLow: false, minRR: 0, maxRR: 1e9, tpMode: 'liquidity',
+    maxBarsToEntry: p.ltfMaxBars, costR: 0, spread: 0,
+  }).filter(s => s.armedAt != null);
+  const A = atr(ch, 14);
+  const hours = p.session ? c1.map(x => nyClock(x.t).hour) : null;
+  const idxAt = t => { let lo = 0, hi = c1.length; while (lo < hi) { const m = (lo + hi) >> 1; if (c1[m].t < t) lo = m + 1; else hi = m; } return lo; };
+  const byDir = { short: ltf.filter(s => s.dir === 'short'), long: ltf.filter(s => s.dir === 'long') };
+  const out = [];
+  for (const S of htf) {
+    const sg = S.dir === 'short' ? 1 : -1;            // work in "short" orientation: sg * price
+    const buf = p.zoneBufferATR * (A[S.lb.i] || 0);
+    const from = idxAt(ch[S.armedAt].t);
+    const to = Math.min(c1.length - 1, idxAt(ch[S.expiresAt].t + p.htfSeconds) - 1);
+    // price has to come back into the HTF zone (reach the HTF entry) before we look for the 1m entry
+    let touch = -1, end = to;
+    for (let j = from; j <= to; j++) {
+      const b = c1[j];
+      const hi = sg > 0 ? b.h : -b.l, lo = sg > 0 ? b.l : -b.h, cl = sg * b.c;
+      if (touch < 0 && lo <= sg * S.tp) { end = -1; break; }               // target reached first: setup done
+      if (touch < 0 && hi >= sg * S.entry) touch = j;
+      if (cl > sg * S.lb.top + buf) { end = j; break; }                   // HTF LB broken
+    }
+    if (touch < 0 || end < touch) continue;
+    const L = byDir[S.dir].find(L => L.lb.i >= touch && L.lb.i <= end && L.armedAt <= end
+      && sg * L.lb.top <= sg * S.lb.top + buf
+      && (!hours || (hours[L.armedAt] >= p.session[0] && hours[L.armedAt] < p.session[1])));
+    if (!L) continue;
+    const risk = sg * (L.sl - L.entry);
+    let tp = S.tp, rr = sg * (L.entry - S.tp) / risk;
+    if (!(risk > 0) || rr < p.minRR || rr > p.maxRR) continue;
+    if (p.mtfFixedR) {                                   // fixed target, only when the liquidity lies beyond it
+      if (rr < p.mtfFixedR) continue;
+      tp = L.entry - sg * p.mtfFixedR * risk; rr = p.mtfFixedR;
+    }
+    const s = {
+      ...L, dir: S.dir, tp, rr, htf: { lb: S.lb, entry: S.entry, sl: S.sl, tf: p.htfSeconds },
+      armedAt: L.armedAt, expiresAt: Math.min(end, L.armedAt + p.ltfMaxBars),
+    };
+    s.result = simulateTrade(c1, { dir: s.dir, entry: s.entry, sl: s.sl, tp: s.tp, armedAt: s.armedAt, expiresAt: s.expiresAt },
+      { costR: p.costR + (p.spread || 0) / risk, maxBarsInTrade: p.maxBarsInTrade * 5, partialR: p.partialR, partialPct: p.partialPct });
+    s.status = s.result.status;
+    s.id = `${s.dir}-${S.lb.t}`;
+    out.push(s);
+  }
+  return out.sort((a, b) => a.armedAt - b.armedAt);
 }

@@ -17,13 +17,17 @@ SYMBOLS = {  # dukascopy name -> (our id, expected price range for scale detecti
 OUT = 'duka'
 
 
-def fetch(sym, d):
+def fetch(sym, d, attempts=4):
     url = f'https://datafeed.dukascopy.com/datafeed/{sym}/{d.year}/{d.month - 1:02d}/{d.day:02d}/BID_candles_min_1.bi5'
-    for attempt in range(4):
+    for attempt in range(attempts):
         try:
             with urllib.request.urlopen(urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'}), timeout=30) as r:
                 raw = r.read()
             if not raw:
+                # an empty answer on a weekday is usually throttling, not a holiday: try again
+                if d.weekday() < 5 and attempt < attempts - 1:
+                    time.sleep(2 + attempt * 3)
+                    continue
                 return d, []
             data = lzma.decompress(raw)
             rows = [struct.unpack('>IIIIIf', data[i:i + 24]) for i in range(0, len(data) - 23, 24)]
@@ -47,11 +51,21 @@ def main():
             continue
         t0 = time.time()
         results = []
-        with ThreadPoolExecutor(12) as ex:
+        with ThreadPoolExecutor(8) as ex:
             for k, res in enumerate(ex.map(lambda d: fetch(sym, d), days)):
                 results.append(res)
                 if k % 100 == 0:
                     print(f'{sym}: {k}/{len(days)} days, {time.time() - t0:.0f}s', flush=True)
+        # second chance for days that failed or came back empty on a weekday, slowly
+        for rnd in range(3):
+            redo = [d for d, r in results if r is None or (not r and d.weekday() < 5)]
+            if not redo:
+                break
+            print(f'{sym}: retry round {rnd + 1}, {len(redo)} days', flush=True)
+            time.sleep(10)
+            with ThreadPoolExecutor(3) as ex:
+                again = dict(ex.map(lambda d: fetch(sym, d, attempts=3), redo))
+            results = [(d, again.get(d, r)) if d in again and again[d] is not None else (d, r) for d, r in results]
         results.sort(key=lambda x: x[0])
         failed = [d for d, r in results if r is None]
         m1 = []
