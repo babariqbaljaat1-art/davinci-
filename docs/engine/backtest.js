@@ -12,7 +12,7 @@ const closed = t => ['win', 'loss', 'timeout'].includes(t.result.status);
  */
 export function backtest(candles, params = {}, { mcRuns = 5000, splitAt = 0.7 } = {}) {
   const setups = findSetups(candles, params);
-  const trades = tradesFromSetups(setups);
+  const trades = tradesFromSetups(setups, { candles, maxPerDay: params.maxTradesPerDay || 0 });
   const done = trades.filter(closed);
   const cut = Math.floor(candles.length * splitAt);
   const inS = done.filter(t => t.result.fillAt < cut);

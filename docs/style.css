@@ -244,3 +244,4 @@ legend { font-size: 0.8rem; color: var(--muted); padding: 0 4px; }
 
 .research h2 { margin-bottom: 6px; }
 .research td:nth-child(2) { white-space: normal; min-width: 160px; }
+.res-notes { margin: 8px 0; padding-left: 18px; display: grid; gap: 4px; }

@@ -50,7 +50,8 @@ export function pivots(candles, k = 3) {
  * If SL and TP are both inside one bar, SL is assumed first (conservative).
  * costR: round-trip cost (spread + commission + slippage) expressed in R.
  */
-export function simulateTrade(candles, setup, { costR = 0.05, maxBarsInTrade = 500 } = {}) {
+export function simulateTrade(candles, setup, { costR = 0.05, maxBarsInTrade = 500, partialR = 0, partialPct = 0.5 } = {}) {
+  if (partialR > 0) return simulateManaged(candles, setup, { costR, maxBarsInTrade, partialR, partialPct });
   const { dir, entry, sl, tp } = setup;
   const short = dir === 'short';
   const risk = Math.abs(sl - entry);
@@ -257,4 +258,46 @@ export function periodBias(candles, period = 'daily') {
     out[i] = bias;
   }
   return out;
+}
+
+/**
+ * Trade management from the webinars: bank `partialPct` at `partialR`, then move the stop to entry
+ * (break-even) and let the rest run to the target. Same conventions as simulateTrade (SL first on ties).
+ */
+function simulateManaged(candles, setup, { costR, maxBarsInTrade, partialR, partialPct }) {
+  const { dir, entry, sl, tp } = setup;
+  const short = dir === 'short';
+  const risk = Math.abs(sl - entry);
+  if (!(risk > 0)) return { status: 'invalid' };
+  const rewardR = Math.abs(tp - entry) / risk;
+  if (partialR >= rewardR) return simulateTrade(candles, setup, { costR, maxBarsInTrade });
+  const pPrice = short ? entry - partialR * risk : entry + partialR * risk;
+  let fillAt = -1;
+  const last = Math.min(setup.expiresAt ?? candles.length - 1, candles.length - 1);
+  for (let i = setup.armedAt; i <= last; i++) {
+    const b = candles[i];
+    if (short ? b.h >= entry : b.l <= entry) { fillAt = i; break; }
+    if (short ? b.l <= tp : b.h >= tp) return { status: 'missed', at: i };
+  }
+  if (fillAt < 0) return { status: last >= candles.length - 1 ? 'pending' : 'expired' };
+  let banked = false, stop = sl;
+  const end = Math.min(candles.length - 1, fillAt + maxBarsInTrade);
+  for (let i = fillAt; i <= end; i++) {
+    const b = candles[i];
+    const hitStop = short ? b.h >= stop : b.l <= stop;
+    if (hitStop) {
+      const r = banked ? partialPct * partialR : -1;
+      return { status: banked ? (r > 0 ? 'win' : 'loss') : 'loss', fillAt, exitAt: i, r: r - costR, exit: stop, partial: banked };
+    }
+    if (!banked && i > fillAt && (short ? b.l <= pPrice : b.h >= pPrice)) { banked = true; stop = entry; }
+    if (banked && (short ? b.l <= tp : b.h >= tp)) {
+      return { status: 'win', fillAt, exitAt: i, r: partialPct * partialR + (1 - partialPct) * rewardR - costR, exit: tp, partial: true };
+    }
+  }
+  if (end >= candles.length - 1) {
+    const mark = candles[candles.length - 1].c;
+    return { status: 'open', fillAt, r: (short ? entry - mark : mark - entry) / risk, mark };
+  }
+  const exit = candles[end].c, open = (short ? entry - exit : exit - entry) / risk;
+  return { status: 'timeout', fillAt, exitAt: end, r: (banked ? partialPct * partialR + (1 - partialPct) * open : open) - costR, exit };
 }

@@ -61,7 +61,13 @@ function setupSettings({ toast, reload }) {
       body: JSON.stringify({ title: 'Da Vinci Scanner', body: 'Test alert', text: '✅ Da Vinci Scanner test message', telegram: true }) })).json();
     $('#set-error').textContent = r.telegram === 'sent' ? 'Telegram par test message chala gaya.' : `Telegram: ${r.telegram}`;
   });
-  $('#set-quit').addEventListener('click', async () => {
+  $('#set-quit').addEventListener('click', async e => {
+    const b = e.currentTarget;
+    if (b.dataset.confirm !== '1') {                  // destructive: ask once more
+      b.dataset.confirm = '1'; b.textContent = 'Pakka band karein? Dobara dabao';
+      setTimeout(() => { b.dataset.confirm = ''; b.textContent = 'Scanner band karo'; }, 5000);
+      return;
+    }
     await fetch('/api/quit', { method: 'POST', body: '{}' }).catch(() => {});
     document.body.innerHTML = '<p style="padding:24px">Da Vinci Scanner band ho gaya. Ye window band kar do.</p>';
   });

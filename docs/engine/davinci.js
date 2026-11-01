@@ -35,6 +35,9 @@ export const DEFAULTS = {
   maxRR: 20,
   maxBarsToEntry: 200,
   maxBarsInTrade: 400,
+  partialR: 0,            // >0: take `partialPct` off at this R and move the stop to entry (webinars)
+  partialPct: 0.5,
+  maxTradesPerDay: 0,     // >0: at most this many trades per New York trading day (webinars: 1-2)
   costR: 0.05,            // slippage + commission per trade, in R
   spread: 0,              // bid/ask spread in price units; added to the cost as spread / risk
   bias: 'none',           // 'none' | 'htf' | 'daily' | 'weekly' (direction from the last prev-day/week high-low sweep)
@@ -235,7 +238,7 @@ function detectBearish(c, p, A, piv, refs, hours) {
       expiresAt = Math.min(expiresAt, e);
     }
     const s = { ...base, tp: armed.tp, rr: armed.rr, armedAt: armed.at, expiresAt, status: 'armed' };
-    s.result = simulateTrade(c, { dir: 'short', entry: s.entry, sl: s.sl, tp: s.tp, armedAt: s.armedAt, expiresAt: s.expiresAt }, { costR: p.costR + (p.spread || 0) / Math.abs(s.sl - s.entry), maxBarsInTrade: p.maxBarsInTrade });
+    s.result = simulateTrade(c, { dir: 'short', entry: s.entry, sl: s.sl, tp: s.tp, armedAt: s.armedAt, expiresAt: s.expiresAt }, { costR: p.costR + (p.spread || 0) / Math.abs(s.sl - s.entry), maxBarsInTrade: p.maxBarsInTrade, partialR: p.partialR, partialPct: p.partialPct });
     s.status = s.result.status;
     setups.push(s);
   }
@@ -298,14 +301,21 @@ export function findSetups(candles, params = {}) {
  * Backtest = every armed setup, taking only one trade at a time
  * (a setup that fills while another trade is open is skipped).
  */
-export function tradesFromSetups(setups) {
+export function tradesFromSetups(setups, { candles = null, maxPerDay = 0 } = {}) {
   const done = setups
     .filter(s => s.result && ['win', 'loss', 'timeout', 'open'].includes(s.result.status))
     .sort((a, b) => a.result.fillAt - b.result.fillAt);
   const taken = [];
+  const perDay = new Map();
   let busyUntil = -1;
   for (const s of done) {
     if (s.result.fillAt <= busyUntil) continue;
+    if (maxPerDay > 0 && candles) {
+      const day = nyClock(candles[s.result.fillAt].t).tradeDay;
+      const n = perDay.get(day) || 0;
+      if (n >= maxPerDay) continue;
+      perDay.set(day, n + 1);
+    }
     taken.push(s);
     busyUntil = s.result.exitAt ?? Infinity;
   }

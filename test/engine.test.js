@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { findSetups, tradesFromSetups } from '../docs/engine/davinci.js';
-import { pivots, stats, monteCarlo, mulberry32 } from '../docs/engine/core.js';
+import { pivots, stats, monteCarlo, mulberry32, simulateTrade } from '../docs/engine/core.js';
 
 // Build candles that walk through price waypoints (a zigzag), `bars` candles per leg.
 function path(points, bars = 8, seed = 1, t0 = 1_700_000_000, tf = 900) {
@@ -114,4 +114,36 @@ test('pivots confirm k bars later', () => {
   const { highs } = pivots(c, 3);
   assert.equal(highs.length, 1);
   assert.equal(highs[0].confirmedAt, highs[0].i + 3);
+});
+
+// Hand-made bars for the trade simulator: [high, low] per bar, close = midpoint.
+const bars = hl => hl.map(([h, l], i) => ({ t: 1_700_000_000 + i * 300, o: (h + l) / 2, h, l, c: (h + l) / 2 }));
+const LONG = { dir: 'long', entry: 100, sl: 99, tp: 104, armedAt: 0, expiresAt: 50 };
+
+test('partials: half off at 2R then break-even stop', () => {
+  // fill, run to 2R (102), come back to entry -> +1R on half, 0 on the rest
+  const c = bars([[100.5, 99.9], [102.1, 100.2], [101, 99.95]]);
+  const r = simulateTrade(c, LONG, { costR: 0, partialR: 2, partialPct: 0.5 });
+  assert.equal(r.status, 'win');
+  assert.equal(r.r, 1);
+  assert.equal(r.exitAt, 2);
+  // the same path without management is still open (stop 99 not touched)
+  assert.equal(simulateTrade(c, LONG, { costR: 0 }).status, 'open');
+});
+
+test('partials: full target pays the blended R; a straight stop is -1R', () => {
+  const win = simulateTrade(bars([[100.5, 99.9], [102.1, 100.2], [104.2, 101]]), LONG, { costR: 0, partialR: 2, partialPct: 0.5 });
+  assert.equal(win.status, 'win');
+  assert.equal(win.r, 0.5 * 2 + 0.5 * 4);
+  const loss = simulateTrade(bars([[100.5, 99.9], [100.4, 98.9]]), LONG, { costR: 0, partialR: 2, partialPct: 0.5 });
+  assert.equal(loss.status, 'loss');
+  assert.equal(loss.r, -1);
+});
+
+test('max trades per New York day', () => {
+  const c = bars(Array.from({ length: 40 }, () => [101, 99]));
+  const mk = (fillAt, exitAt) => ({ result: { status: 'win', fillAt, exitAt, r: 1 } });
+  const setups = [mk(1, 2), mk(3, 4), mk(5, 6), mk(7, 8)];
+  assert.equal(tradesFromSetups(setups).length, 4);
+  assert.equal(tradesFromSetups(setups, { candles: c, maxPerDay: 2 }).length, 2);
 });
