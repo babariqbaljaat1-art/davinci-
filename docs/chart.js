@@ -11,7 +11,7 @@ export class Chart {
     this.setups = [];
     this.focusId = null;
     this.spacing = 8;        // px per bar
-    this.offset = 0;         // bars scrolled back from the latest (can be negative = empty space on the right)
+    this.offset = 0;         // bars scrolled back into history (negative = empty space right of the last bar)
     this.hover = null;
     this.onHover = onHover;
     this.digits = 2;
@@ -35,10 +35,10 @@ export class Chart {
     this.focusId = id;
     const s = this.setups.find(x => x.id === id);
     if (s) {
+      // put the liquidity block ~30% from the left edge
       const i = this.indexOf(s.lb.t);
-      const visible = this.visibleBars();
-      const want = this.candles.length - 1 - i - Math.floor(visible * 0.35);
-      this.offset = Math.max(-8, Math.min(want, this.candles.length - 10));
+      this.offset = this.candles.length - 1 - i + 0.5 - this.visibleBars() * 0.7;
+      this.clampOffset();
     }
     this.draw();
   }
@@ -63,7 +63,7 @@ export class Chart {
     this.spacing = Math.max(1.5, Math.min(40, this.spacing * f));
     // keep the bar under the anchor in place
     const last = this.candles.length - 1;
-    this.offset = last - barAtAnchor - (w - ax) / this.spacing + 0.5;
+    this.offset = last + 0.5 - (w - ax) / this.spacing - barAtAnchor;
     this.clampOffset();
     this.draw();
   }
@@ -80,8 +80,8 @@ export class Chart {
   plotW() { return Math.max(50, (this.W || 300) - 64); }
   plotH() { return Math.max(50, (this.H || 300) - 22); }
   visibleBars() { return this.plotW() / this.spacing; }
-  barToX(i) { const last = this.candles.length - 1; return this.plotW() - (last - i + this.offset + 0.5) * this.spacing; }
-  xToBar(x) { const last = this.candles.length - 1; return last - this.offset - (this.plotW() - x) / this.spacing + 0.5; }
+  barToX(i) { const last = this.candles.length - 1; return this.plotW() - (last - i - this.offset + 0.5) * this.spacing; }
+  xToBar(x) { const last = this.candles.length - 1; return last - this.offset + 0.5 - (this.plotW() - x) / this.spacing; }
   indexOf(t) {
     const c = this.candles;
     if (!c.length) return 0;

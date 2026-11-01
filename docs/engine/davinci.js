@@ -28,7 +28,8 @@ export const DEFAULTS = {
   equalTolATR: 0.15,      // "equal" lows/highs tolerance, in ATR
   entryMode: 'level',     // 'level' = swept level H0, 'body' = LB candle body, 'mid' = 50% of LB
   slBufferATR: 0.10,      // extra room beyond the LB extreme
-  tpMode: 'liquidity',    // 'liquidity' = opposing lows/highs, 'fixedR' = fixed multiple
+  minRiskATR: 0,          // stop at least this many ATR from entry (0 = off)
+  tpMode: 'liquidity',    // 'liquidity' = opposing lows/highs, 'nearest' = nearer respected low, 'fixedR' = fixed multiple (only if liquidity lies beyond it)
   fixedR: 3,
   minRR: 3,
   maxRR: 20,
@@ -130,7 +131,7 @@ function detectBearish(c, p, A, piv) {
       : p.entryMode === 'mid' ? (top + Math.min(level, bodyTop)) / 2
       : level;
     if (entry >= top - 0.05 * atrI) continue;
-    const sl = top + p.slBufferATR * atrI;
+    const sl = Math.max(top + p.slBufferATR * atrI, entry + p.minRiskATR * atrI);
 
     // Low that led into the sweep (sellers' BOS reference)
     const prevLows = lows.filter(l => l.i > H0.i && l.i < i);
@@ -172,7 +173,12 @@ function detectBearish(c, p, A, piv) {
       if (t < start || !bos) continue;
       const ready = buildup.length >= p.minBuildup && (!p.requireRespectedLow || respected);
       if (!armed && ready) {
-        let tp = p.tpMode === 'fixedR' ? entry - p.fixedR * (sl - entry) : extreme.price;
+        let tp = extreme.price;
+        if (p.tpMode === 'nearest' && respected) tp = Math.min(respected.price, entry - (sl - entry) * p.minRR);
+        if (p.tpMode === 'fixedR') {
+          tp = entry - p.fixedR * (sl - entry);
+          if (tp < extreme.price) continue;                          // opposing liquidity must lie beyond the target
+        }
         const rr = (entry - tp) / (sl - entry);
         if (rr < p.minRR || rr > p.maxRR) continue;                  // wait: RR may improve with a lower low
         // the market must still be below the entry when we arm

@@ -125,12 +125,16 @@ export async function fetchCandles(market, tf) {
   if (process.env.DEMO) return demo(market, tf);
   const src = market.source || 'yahoo';
   let candles;
-  if (src === 'twelvedata') candles = await twelvedata(market.twelvedata || market.symbol, tf);
+  if (process.env.RAW_DIR) {   // replay saved candles (research / offline)
+    const { readFile } = await import('node:fs/promises');
+    candles = JSON.parse(await readFile(`${process.env.RAW_DIR}/${market.id}_${tf}.json`, 'utf8'));
+  } else if (src === 'twelvedata') candles = await twelvedata(market.twelvedata || market.symbol, tf);
   else if (src === 'binance') candles = await binance(market.binance || market.symbol, tf);
   else candles = await yahoo(market.yahoo || market.symbol, tf);
   // remove duplicate timestamps and the incomplete current bar
   const seen = new Set();
   candles = candles.filter(c => (seen.has(c.t) ? false : (seen.add(c.t), true)));
+  if (SECONDS[tf] < 86400 && tf !== '4h') candles = candles.filter(c => c.t % SECONDS[tf] === 0 && c.h >= c.l);
   const now = Math.floor(Date.now() / 1000);
   while (candles.length && candles[candles.length - 1].t + SECONDS[tf] > now) candles.pop();
   return candles;

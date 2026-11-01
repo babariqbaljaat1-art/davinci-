@@ -1,16 +1,41 @@
 {
   "appUrl": "",
   "markets": [
-    { "id": "XAUUSD", "name": "Gold", "yahoo": "GC=F", "twelvedata": "XAU/USD", "source": "yahoo", "digits": 2 },
-    { "id": "NAS100", "name": "Nasdaq 100", "yahoo": "NQ=F", "source": "yahoo", "digits": 1 },
-    { "id": "US30", "name": "Dow Jones", "yahoo": "YM=F", "source": "yahoo", "digits": 0 }
+    {
+      "id": "XAUUSD",
+      "name": "Gold",
+      "yahoo": "GC=F",
+      "twelvedata": "XAU/USD",
+      "source": "yahoo",
+      "digits": 2
+    },
+    {
+      "id": "NAS100",
+      "name": "Nasdaq 100",
+      "yahoo": "NQ=F",
+      "source": "yahoo",
+      "digits": 1
+    },
+    {
+      "id": "US30",
+      "name": "Dow Jones",
+      "yahoo": "YM=F",
+      "source": "yahoo",
+      "digits": 0
+    }
   ],
-  "timeframes": ["15m", "1h"],
+  "timeframes": [
+    "15m",
+    "1h"
+  ],
   "params": {
     "pivotK": 3,
-    "entryMode": "level",
+    "entryMode": "mid",
     "minRR": 3,
-    "slBufferATR": 0.1,
+    "slBufferATR": 0.3,
+    "minRiskATR": 0.5,
+    "tpMode": "fixedR",
+    "fixedR": 3,
     "costR": 0.05,
     "bias": "none"
   },
@@ -19,7 +44,7 @@
     "telegram": true,
     "onNewSetup": true,
     "onResult": true,
-    "requireEdge": false,
-    "minBacktestTrades": 20
+    "requireEdge": true,
+    "minBacktestTrades": 30
   }
 }

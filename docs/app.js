@@ -20,7 +20,7 @@ const store = {
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* private mode */ } },
 };
 
-let index = null, current = null, data = null, showHistory = false;
+let index = null, current = null, data = null, showHistory = false, pendingFocus = null;
 const chart = new Chart($('#chart'), { onHover: c => showOHLC(c) });
 
 function digitsOf(m) { return m?.digits ?? 2; }
@@ -53,7 +53,9 @@ async function loadIndex() {
     $('#updated').innerHTML = `<span class="lbl">Update: </span>${ago(index.updated)}`;
     renderTabs();
     notifyNew();
-    const want = decodeURIComponent(location.hash.slice(1)) || store.get('market', null);
+    const [want0, focusId] = decodeURIComponent(location.hash.slice(1)).split('/');
+    const want = want0 || store.get('market', null);
+    pendingFocus = focusId || null;
     const pick = index.items.find(i => i.key === want) || index.items.find(i => !i.error) || index.items[0];
     if (pick && (!current || current !== pick.key || !data)) await select(pick.key, false);
     else if (current) await select(current, false, true);
@@ -103,7 +105,11 @@ async function select(key, user, keepView = false) {
   $('#sym').textContent = `${data.market.id} · ${data.market.name}`;
   $('#tfname').textContent = data.tf;
   chart.setData({ candles: data.candles, setups: visibleSetups(), digits: digitsOf(data.market), tfSeconds: TF_SEC[data.tf] });
-  if (!keepView) {
+  if (pendingFocus && data.setups.some(s => s.id === pendingFocus)) {
+    toggleHistory(true);
+    chart.focus(pendingFocus);
+    pendingFocus = null;
+  } else if (!keepView) {
     chart.fit();
     const live = data.setups.filter(s => s.status === 'pending' || s.status === 'open');
     if (live.length) chart.focus(live[live.length - 1].id); else chart.focus(null);
@@ -258,7 +264,11 @@ $('#chart').addEventListener('keydown', e => {
 });
 $('#history').addEventListener('click', () => toggleHistory());
 document.querySelectorAll('[data-zoom]').forEach(b => b.addEventListener('click', () => chart.zoom(b.dataset.zoom === 'in' ? 1.25 : 0.8)));
-window.addEventListener('hashchange', () => { const k = location.hash.slice(1); if (k && k !== current) select(k, false); });
+window.addEventListener('hashchange', () => {
+  const [k, f] = decodeURIComponent(location.hash.slice(1)).split('/');
+  pendingFocus = f || null;
+  if (k) select(k, false, false);
+});
 document.addEventListener('visibilitychange', () => { if (!document.hidden) loadIndex(); });
 setupNotifyButton();
 loadIndex();
