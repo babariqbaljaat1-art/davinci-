@@ -16,7 +16,7 @@
 // before entry ("liquidity already taken, setup done"), RR is below minimum,
 // or the setup takes too long.
 
-import { atr, pivots, simulateTrade, resample, nyClock, referenceLevels } from './core.js';
+import { atr, pivots, simulateTrade, resample, nyClock, referenceLevels, periodBias } from './core.js';
 
 export const DEFAULTS = {
   pivotK: 3,              // swing strength (bars each side)
@@ -35,8 +35,9 @@ export const DEFAULTS = {
   maxRR: 20,
   maxBarsToEntry: 200,
   maxBarsInTrade: 400,
-  costR: 0.05,            // spread + slippage + commission per trade, in R
-  bias: 'none',           // 'none' | 'htf'
+  costR: 0.05,            // slippage + commission per trade, in R
+  spread: 0,              // bid/ask spread in price units; added to the cost as spread / risk
+  bias: 'none',           // 'none' | 'htf' | 'daily' | 'weekly' (direction from the last prev-day/week high-low sweep)
   session: null,          // e.g. [8, 11] = only arm/fill between 08:00 and 11:00 New York time
   refLevels: false,       // true = the LB must sweep a session level (prev day / Asia / London high or low)
   htfFactor: 4,           // HTF = this many base bars (e.g. 1h -> 4h)
@@ -90,6 +91,15 @@ function detectBearish(c, p, A, piv, refs, hours) {
   const { highs, lows } = piv;
   const n = c.length;
   const setups = [];
+  // sparse table: rangeMax(a, b) = max high in [a, b] in O(1)
+  const LOG = new Uint8Array(n + 1); for (let k = 2; k <= n; k++) LOG[k] = LOG[k >> 1] + 1;
+  const sp = [Float64Array.from(c, x => x.h)];
+  for (let j = 1; (1 << j) <= n; j++) {
+    const prev = sp[j - 1], half = 1 << (j - 1), cur = new Float64Array(n - (1 << j) + 1);
+    for (let k = 0; k < cur.length; k++) cur[k] = Math.max(prev[k], prev[k + half]);
+    sp.push(cur);
+  }
+  const rangeMax = (a, b) => { if (b < a) return -Infinity; const j = LOG[b - a + 1]; return Math.max(sp[j][a], sp[j][b - (1 << j) + 1]); };
 
   for (const H1 of highs) {
     const i = H1.i;
@@ -110,21 +120,23 @@ function detectBearish(c, p, A, piv, refs, hours) {
         if (!H0 || r.price > H0.price) H0 = { i: r.knownAt - 1, price: r.price, kind: r.kind };
       }
     }
-    for (let q = refs ? -1 : highs.length - 1; q >= 0; q--) {
-      const h = highs[q];
-      if (h.i >= i) continue;
-      if (h.i < i - p.sweepLookback) break;
-      if (h.confirmedAt > i || h.price >= H1.price) continue;
+    if (!refs) {
       // H0 must stay intact until the pullback low that starts the sweep leg,
       // and H1 must be the highest point since H0.
-      let lowIdx = -1, ok = true;
-      for (let x = h.i + 1; x < i; x++) {
-        if (c[x].h > H1.price) { ok = false; break; }
-        if (lowIdx < 0 || c[x].l < c[lowIdx].l) lowIdx = x;
+      let x = i - 1, lowIdx = -1, maxSince = -Infinity;
+      for (let q = firstAfter(highs, i - 1) - 1; q >= 0; q--) {
+        const h = highs[q];
+        if (h.i < i - p.sweepLookback) break;
+        while (x > h.i) {                                    // extend the suffix (h.i, i)
+          if (c[x].h > maxSince) maxSince = c[x].h;
+          if (lowIdx < 0 || c[x].l < c[lowIdx].l) lowIdx = x;
+          x--;
+        }
+        if (maxSince > H1.price) break;                      // higher than H1 since here: older highs fail too
+        if (h.confirmedAt > i || h.price >= H1.price || lowIdx < 0) continue;
+        if (rangeMax(h.i + 1, lowIdx) > h.price) continue;   // taken before the sweep leg started
+        if (!H0 || h.price > H0.price) H0 = h;
       }
-      if (!ok || lowIdx < 0) continue;
-      for (let x = h.i + 1; x <= lowIdx; x++) if (c[x].h > h.price) { ok = false; break; }
-      if (ok && (!H0 || h.price > H0.price)) H0 = h;
     }
     if (!H0) continue;
 
@@ -147,8 +159,9 @@ function detectBearish(c, p, A, piv, refs, hours) {
     const sl = Math.max(top + p.slBufferATR * atrI, entry + p.minRiskATR * atrI);
 
     // Low that led into the sweep (sellers' BOS reference)
-    const prevLows = lows.filter(l => l.i > H0.i && l.i < i);
-    let Lp = prevLows.length ? prevLows[prevLows.length - 1] : null;
+    // last swing low strictly between H0 and H1 (binary search instead of scanning every low)
+    const li0 = firstAfter(lows, i - 1) - 1;
+    let Lp = li0 >= 0 && lows[li0].i > H0.i && lows[li0].i < i ? lows[li0] : null;
     if (!Lp) {
       let li = H0.i + 1;
       for (let x = H0.i + 1; x < i; x++) if (c[x].l < c[li].l) li = x;
@@ -222,7 +235,7 @@ function detectBearish(c, p, A, piv, refs, hours) {
       expiresAt = Math.min(expiresAt, e);
     }
     const s = { ...base, tp: armed.tp, rr: armed.rr, armedAt: armed.at, expiresAt, status: 'armed' };
-    s.result = simulateTrade(c, { dir: 'short', entry: s.entry, sl: s.sl, tp: s.tp, armedAt: s.armedAt, expiresAt: s.expiresAt }, { costR: p.costR, maxBarsInTrade: p.maxBarsInTrade });
+    s.result = simulateTrade(c, { dir: 'short', entry: s.entry, sl: s.sl, tp: s.tp, armedAt: s.armedAt, expiresAt: s.expiresAt }, { costR: p.costR + (p.spread || 0) / Math.abs(s.sl - s.entry), maxBarsInTrade: p.maxBarsInTrade });
     s.status = s.result.status;
     setups.push(s);
   }
@@ -251,7 +264,7 @@ export function findSetups(candles, params = {}) {
   const p = { ...DEFAULTS, ...params };
   if (candles.length < 50) return [];
   const A = atr(candles, 14);
-  const bias = p.bias === 'htf' ? htfBias(candles, p.htfFactor) : null;
+  const bias = p.bias === 'htf' ? htfBias(candles, p.htfFactor) : (p.bias === 'daily' || p.bias === 'weekly') ? periodBias(candles, p.bias) : null;
 
   const hours = p.session ? candles.map(c => nyClock(c.t).hour) : null;
   let refsBear = null, refsBull = null;

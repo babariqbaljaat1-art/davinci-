@@ -35,6 +35,7 @@ export function serializeSetup(s, c, digits) {
  */
 export function buildReport(market, tf, candles, params, { chartBars = 600, mcRuns = 5000, withRobustness = true, updated } = {}) {
   const digits = market.digits ?? 2;
+  if (market.spread != null) params = { ...params, spread: market.spread };
   const setups = findSetups(candles, params);
   const bt = backtest(candles, params, { mcRuns });
   const grid = withRobustness ? robustness(candles, params) : [];

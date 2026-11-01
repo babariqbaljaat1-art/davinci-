@@ -226,3 +226,35 @@ export function referenceLevels(candles) {
   }
   return { highs, lows };
 }
+
+/**
+ * Daily / weekly bias from the course webinars: once price takes the previous day's (week's)
+ * low, the draw is to the upside (+1, look for buys); once it takes the previous high, -1.
+ * The latest sweep wins and holds until the next one. No look-ahead: uses bar highs/lows as they print.
+ */
+export function periodBias(candles, period = 'daily') {
+  const out = new Array(candles.length).fill(0);
+  const keyOf = t => {
+    const d = nyClock(t).tradeDay;
+    if (period !== 'weekly') return d;
+    const dt = new Date(d + 'T00:00:00Z');
+    const monday = new Date(dt.getTime() - ((dt.getUTCDay() + 6) % 7) * 86400000);
+    return monday.toISOString().slice(0, 10);
+  };
+  let key = null, curH = -Infinity, curL = Infinity, prevH = null, prevL = null, bias = 0;
+  for (let i = 0; i < candles.length; i++) {
+    const c = candles[i], k = keyOf(c.t);
+    if (k !== key) {
+      if (key !== null) { prevH = curH; prevL = curL; }
+      key = k; curH = -Infinity; curL = Infinity;
+    }
+    if (prevH !== null) {
+      const tookH = c.h > prevH, tookL = c.l < prevL;
+      if (tookH && !tookL) bias = -1;
+      else if (tookL && !tookH) bias = 1;
+    }
+    curH = Math.max(curH, c.h); curL = Math.min(curL, c.l);
+    out[i] = bias;
+  }
+  return out;
+}

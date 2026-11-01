@@ -20,7 +20,7 @@ const store = {
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* private mode */ } },
 };
 
-let index = null, current = null, data = null, showHistory = false, pendingFocus = null;
+let index = null, current = null, data = null, showHistory = false, pendingFocus = null, selectSeq = 0;
 const chart = new Chart($('#chart'), { onHover: c => showOHLC(c) });
 
 function digitsOf(m) { return m?.digits ?? 2; }
@@ -39,6 +39,13 @@ function esc(s) { return String(s).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<
 function pctTxt(v) { return `${Math.round((v || 0) * 100)}%`; }
 function rTxt(v) { return `${v > 0 ? '+' : ''}${(v || 0).toFixed(2)}R`; }
 
+// Data source: the cloud build reads saved JSON; the PC app installs a live provider first.
+const provider = window.DAVINCI_PROVIDER || {
+  mode: 'cloud',
+  index: () => getJSON('data/index.json'),
+  report: key => getJSON(`data/${key}.json`),
+};
+
 async function getJSON(url) {
   const res = await fetch(`${url}?v=${Math.floor(Date.now() / 30000)}`, { cache: 'no-store' });
   if (!res.ok) throw new Error(`${res.status}`);
@@ -47,7 +54,7 @@ async function getJSON(url) {
 
 async function loadIndex() {
   try {
-    index = await getJSON('data/index.json');
+    index = await provider.index();
     const stale = Date.now() / 1000 - index.updated > 3600;
     $('#dot').className = 'dot ' + (stale ? 'stale' : 'ok');
     $('#updated').innerHTML = `<span class="lbl">Update: </span>${ago(index.updated)}`;
@@ -95,10 +102,14 @@ async function select(key, user, keepView = false) {
   $('#panel').setAttribute('aria-labelledby', `tab-${key}`);
   const item = index?.items.find(i => i.key === key);
   if (item?.error) { showEmpty(`Is market ka data nahi aa saka: ${item.error}`); return; }
+  const seq = ++selectSeq;
   try {
-    data = await getJSON(`data/${key}.json`);
+    if (!data || data.key !== key) { $('#chart-empty').textContent = 'Loading…'; $('#chart-empty').hidden = false; }
+    const rep = await provider.report(key);
+    if (seq !== selectSeq) return;          // a newer selection is already loading
+    data = rep;
   } catch {
-    showEmpty('Is market ka data abhi nahi hai.');
+    if (seq === selectSeq) showEmpty('Is market ka data abhi nahi hai.');
     return;
   }
   $('#chart-empty').hidden = true;
@@ -164,7 +175,7 @@ function renderLive() {
     </article>`;
   };
   let html = live.map(card).join('');
-  if (!live.length) html += `<p class="none">Is waqt ${esc(data.market.id)} ${esc(data.tf)} par koi ready setup nahi. Scanner har ~10 minute check karta hai.</p>`;
+  if (!live.length) html += `<p class="none">Is waqt ${esc(data.market.id)} ${esc(data.tf)} par koi ready setup nahi. Scanner har ${provider.mode === 'pc' ? 'minute' : '~10 minute'} check karta hai.</p>`;
   if (forming.length) html += `<p class="muted small" style="margin:4px 0 0">Ban rahe setups (abhi trade nahi):</p>` + forming.map(card).join('');
   $('#live').innerHTML = html;
   $('#live').querySelectorAll('[data-focus]').forEach(b => b.addEventListener('click', () => {
@@ -255,6 +266,17 @@ function setupNotifyButton() {
   });
 }
 
+async function renderResearch() {
+  try {
+    const r = await (await fetch('research.json', { cache: 'no-store' })).json();
+    const d = t => new Date(t * 1000).toLocaleDateString(undefined, { month: 'short', year: 'numeric' });
+    $('#res-intro').textContent = `${r.markets.join(', ')} · ${d(r.from)} – ${d(r.to)} · ${r.configs} settings · ${r.trades.toLocaleString()} trades simulate hui (spread + cost ke saath). Jo settings pehle 70% aur unseen 30% data, dono par positive rahi: ${r.positiveBoth}.`;
+    const cell = (n, e) => `${n} tr · <span class="${e >= 0 ? 'pos' : 'neg'}">${rTxt(e)}</span>`;
+    $('#res-table tbody').innerHTML = r.rows.map(x => `<tr><td translate="no">${x.tf}</td><td>${esc(x.label)}</td><td class="num">${x.positiveIS}/${x.settings}</td><td class="num">${cell(x.isTrades, x.isExp)}</td><td class="num">${cell(x.oosTrades, x.oosExp)}</td></tr>`).join('');
+  } catch { $('#res-intro').textContent = 'Research data nahi mila.'; }
+}
+renderResearch();
+
 $('#refresh').addEventListener('click', () => { loadIndex(); toast('Refresh…'); });
 $('#fit').addEventListener('click', () => chart.fit());
 // keyboard control for the chart canvas
@@ -271,6 +293,7 @@ window.addEventListener('hashchange', () => {
 });
 document.addEventListener('visibilitychange', () => { if (!document.hidden) loadIndex(); });
 setupNotifyButton();
+if (provider.setupSettings) provider.setupSettings({ toast, reload: () => { data = null; loadIndex(); } });
 loadIndex();
-setInterval(loadIndex, 60_000);
-if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
+setInterval(loadIndex, provider.mode === 'pc' ? 30_000 : 60_000);
+if (provider.mode !== 'pc' && 'serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});

@@ -7,37 +7,44 @@
       "yahoo": "GC=F",
       "twelvedata": "XAU/USD",
       "source": "yahoo",
-      "digits": 2
+      "digits": 2,
+      "spread": 0.1
     },
     {
       "id": "NAS100",
       "name": "Nasdaq 100",
       "yahoo": "NQ=F",
       "source": "yahoo",
-      "digits": 1
+      "digits": 1,
+      "spread": 0.5
     },
     {
       "id": "US30",
       "name": "Dow Jones",
       "yahoo": "YM=F",
       "source": "yahoo",
-      "digits": 0
+      "digits": 0,
+      "spread": 2
     }
   ],
   "timeframes": [
-    "15m",
-    "1h"
+    "5m",
+    "15m"
   ],
   "params": {
     "pivotK": 3,
-    "entryMode": "mid",
+    "entryMode": "level",
+    "tpMode": "liquidity",
     "minRR": 3,
     "slBufferATR": 0.3,
     "minRiskATR": 0.5,
-    "tpMode": "fixedR",
-    "fixedR": 3,
-    "costR": 0.05,
-    "bias": "none"
+    "costR": 0.02,
+    "session": [
+      8,
+      11
+    ],
+    "refLevels": true,
+    "bias": "daily"
   },
   "chartBars": 600,
   "alerts": {
