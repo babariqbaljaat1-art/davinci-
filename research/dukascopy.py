@@ -39,12 +39,20 @@ def fetch(sym, d):
 
 def main():
     start = date.fromisoformat(sys.argv[1]); end = date.fromisoformat(sys.argv[2])
-    days = [start + timedelta(n) for n in range((end - start).days + 1)]
+    only = sys.argv[3:] or list(SYMBOLS)
+    days = [start + timedelta(n) for n in range((end - start).days + 1) if (start + timedelta(n)).weekday() != 5]  # no Saturday data
     os.makedirs(OUT, exist_ok=True)
     for sym, (sid, (lo, hi)) in SYMBOLS.items():
+        if sym not in only:
+            continue
         t0 = time.time()
-        with ThreadPoolExecutor(32) as ex:
-            results = sorted(ex.map(lambda d: fetch(sym, d), days))
+        results = []
+        with ThreadPoolExecutor(12) as ex:
+            for k, res in enumerate(ex.map(lambda d: fetch(sym, d), days)):
+                results.append(res)
+                if k % 100 == 0:
+                    print(f'{sym}: {k}/{len(days)} days, {time.time() - t0:.0f}s', flush=True)
+        results.sort(key=lambda x: x[0])
         failed = [d for d, r in results if r is None]
         m1 = []
         for d, rows in results:
@@ -56,7 +64,7 @@ def main():
                     continue
                 m1.append((base + sec, o, h, l, c))
         if not m1:
-            print(sym, 'no data'); continue
+            print(sym, 'no data', flush=True); continue
         # price scale: pick the power of ten that puts the median close in the expected range
         med = sorted(r[4] for r in m1[::97])[len(m1[::97]) // 2]
         scale = next(10 ** p for p in range(0, 7) if lo <= med / 10 ** p <= hi)
@@ -74,7 +82,7 @@ def main():
         with gzip.open(f'{OUT}/{sid}_5m.json.gz', 'wt') as f:
             json.dump(rows, f, separators=(',', ':'))
         print(f'{sid}: {len(m1)} m1 -> {len(rows)} m5 bars, scale 1e{len(str(scale)) - 1}, '
-              f'{rows[0][0]}..{rows[-1][0]}, failed days {len(failed)}, {time.time() - t0:.0f}s, last close {rows[-1][4]}')
+              f'{rows[0][0]}..{rows[-1][0]}, failed days {len(failed)}, {time.time() - t0:.0f}s, last close {rows[-1][4]}', flush=True)
 
 
 if __name__ == '__main__':

@@ -5,41 +5,15 @@
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { fetchCandles } from './data.js';
-import { findSetups } from '../docs/engine/davinci.js';
-import { backtest, robustness } from '../docs/engine/backtest.js';
+import { buildReport, indexItem } from '../docs/engine/report.js';
 import { sendTelegram, setupMessage, resultMessage } from './telegram.js';
 
 const DRY = process.argv.includes('--dry');
 const ROOT = new URL('..', import.meta.url).pathname;
 const DATA = `${ROOT}docs/data`;
-const LIVE = new Set(['forming', 'pending', 'open']);
 const FINAL = new Set(['win', 'loss', 'timeout']);
 
 const readJSON = async (p, d) => (existsSync(p) ? JSON.parse(await readFile(p, 'utf8')) : d);
-const round = (v, d) => (v == null ? v : +v.toFixed(d));
-
-function serializeSetup(s, c, digits) {
-  const T = i => (i == null || i < 0 ? null : c[Math.min(i, c.length - 1)].t);
-  const P = v => round(v, digits + 1);
-  const r = s.result || {};
-  return {
-    id: s.id, dir: s.dir, status: s.status,
-    lb: { t: s.lb.t, top: P(s.lb.top), bottom: P(s.lb.bottom), level: P(s.lb.level) },
-    swept: s.swept && { t: s.swept.t, price: P(s.swept.price) },
-    bos: s.bos && { t: T(s.bos.i), price: P(s.bos.price) },
-    buildup: s.buildup.map(h => ({ t: h.t, price: P(h.price) })),
-    respected: s.respected && { t: s.respected.t, price: P(s.respected.price) },
-    extreme: s.extreme && { t: s.extreme.t, price: P(s.extreme.price) },
-    entry: P(s.entry), sl: P(s.sl), tp: P(s.tp), rr: round(s.rr, 2),
-    armedT: T(s.armedAt), fillT: T(r.fillAt), exitT: T(r.exitAt), r: round(r.r, 2),
-    steps: {
-      liquidityBlock: true,
-      buildup: !!s.bos && s.buildup.length > 0,
-      engineeredLows: !!s.respected,
-      entry: !!s.result,
-    },
-  };
-}
 
 async function main() {
   const cfg = JSON.parse(await readFile(`${ROOT}config.json`, 'utf8'));
@@ -58,41 +32,12 @@ async function main() {
           await mkdir(`${ROOT}raw`, { recursive: true });
           await writeFile(`${ROOT}raw/${key}.json`, JSON.stringify(candles));
         }
-        const digits = m.digits ?? 2;
-        const setups = findSetups(candles, cfg.params);
-        const bt = backtest(candles, cfg.params, { mcRuns: 5000 });
-        const grid = robustness(candles, cfg.params);
-        const positive = grid.filter(g => g.trades >= 10 && g.expectancyR > 0).length;
-        const counted = grid.filter(g => g.trades >= 10).length;
-
-        const firstChart = Math.max(0, candles.length - cfg.chartBars);
-        const shown = setups
-          .filter(s => LIVE.has(s.status) || (s.result && s.lb.i >= firstChart))
-          .filter(s => s.lb.i >= firstChart - 50)
-          .map(s => serializeSetup(s, candles, digits));
-
-        const btSummary = {
-          from: bt.from, to: bt.to, bars: bt.bars, splitTime: bt.splitTime,
-          all: bt.all, inSample: bt.inSample, outOfSample: bt.outOfSample, monteCarlo: bt.monteCarlo,
-          equity: bt.equity, recentTrades: bt.trades.slice(-60),
-          robustness: { grid, positive, counted },
-        };
-        const out = {
-          market: m, tf, key, updated: index.updated, params: bt.params,
-          lastPrice: candles[candles.length - 1].c,
-          candles: candles.slice(firstChart).map(c => [c.t, round(c.o, digits + 1), round(c.h, digits + 1), round(c.l, digits + 1), round(c.c, digits + 1)]),
-          setups: shown,
-          backtest: btSummary,
-        };
+        const out = buildReport(m, tf, candles, cfg.params, { chartBars: cfg.chartBars, mcRuns: 5000, updated: index.updated });
         await writeFile(`${DATA}/${key}.json`, JSON.stringify(out));
-
-        const live = shown.filter(s => s.status === 'pending' || s.status === 'open');
-        index.items.push({
-          key, market: m.id, name: m.name, tf, lastPrice: out.lastPrice,
-          live: live.length, forming: shown.filter(s => s.status === 'forming').length,
-          latest: live[live.length - 1] || null,
-          stats: { trades: bt.all.trades, winRate: bt.all.winRate, expectancyR: bt.all.expectancyR, oosExpectancyR: bt.outOfSample.expectancyR },
-        });
+        const item = indexItem(out);
+        index.items.push(item);
+        const bt = out.backtest, shown = out.setups, live = shown.filter(s => s.status === 'pending' || s.status === 'open');
+        const { positive, counted } = bt.robustness, setups = { length: out.setupsFound };
 
         // --- alerts ---
         const edgeOk = !cfg.alerts.requireEdge || (bt.all.trades >= cfg.alerts.minBacktestTrades && bt.outOfSample.expectancyR > 0);

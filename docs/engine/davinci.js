@@ -16,7 +16,7 @@
 // before entry ("liquidity already taken, setup done"), RR is below minimum,
 // or the setup takes too long.
 
-import { atr, pivots, simulateTrade, resample } from './core.js';
+import { atr, pivots, simulateTrade, resample, nyClock, referenceLevels } from './core.js';
 
 export const DEFAULTS = {
   pivotK: 3,              // swing strength (bars each side)
@@ -37,6 +37,8 @@ export const DEFAULTS = {
   maxBarsInTrade: 400,
   costR: 0.05,            // spread + slippage + commission per trade, in R
   bias: 'none',           // 'none' | 'htf'
+  session: null,          // e.g. [8, 11] = only arm/fill between 08:00 and 11:00 New York time
+  refLevels: false,       // true = the LB must sweep a session level (prev day / Asia / London high or low)
   htfFactor: 4,           // HTF = this many base bars (e.g. 1h -> 4h)
 };
 
@@ -84,7 +86,7 @@ function firstAfter(list, i) {
 }
 
 /** Core bearish detector on (possibly mirrored) candles. */
-function detectBearish(c, p, A, piv) {
+function detectBearish(c, p, A, piv, refs, hours) {
   const { highs, lows } = piv;
   const n = c.length;
   const setups = [];
@@ -97,7 +99,18 @@ function detectBearish(c, p, A, piv) {
 
     // Step 1a: which intact swing high did H1 run?
     let H0 = null;
-    for (let q = highs.length - 1; q >= 0; q--) {
+    if (refs) {
+      // session mode: H1 must be the leg that first took a session level (prev day / Asia / London)
+      for (const r of refs) {
+        if (r.knownAt > i || r.knownAt < i - p.sweepLookback || r.price >= H1.price || r.cross < 0) continue;
+        if (r.cross > i || r.cross < i - 2 * p.pivotK - 2) continue;
+        let higher = false;
+        for (let x = r.cross; x < i; x++) if (c[x].h > H1.price) { higher = true; break; }
+        if (higher) continue;
+        if (!H0 || r.price > H0.price) H0 = { i: r.knownAt - 1, price: r.price, kind: r.kind };
+      }
+    }
+    for (let q = refs ? -1 : highs.length - 1; q >= 0; q--) {
       const h = highs[q];
       if (h.i >= i) continue;
       if (h.i < i - p.sweepLookback) break;
@@ -172,6 +185,7 @@ function detectBearish(c, p, A, piv) {
       }
       if (t < start || !bos) continue;
       const ready = buildup.length >= p.minBuildup && (!p.requireRespectedLow || respected);
+      if (hours && !(hours[t] >= p.session[0] && hours[t] < p.session[1])) continue;   // outside the trading session
       if (!armed && ready) {
         let tp = extreme.price;
         if (p.tpMode === 'nearest' && respected) tp = Math.min(respected.price, entry - (sl - entry) * p.minRR);
@@ -201,7 +215,13 @@ function detectBearish(c, p, A, piv) {
       setups.push({ ...base, status: status === 'forming' && endScan >= n - 1 ? 'forming' : (status === 'forming' ? 'expired' : status), invalidAt });
       continue;
     }
-    const s = { ...base, tp: armed.tp, rr: armed.rr, armedAt: armed.at, expiresAt: Math.min(n - 1, i + p.maxBarsToEntry), status: 'armed' };
+    let expiresAt = Math.min(n - 1, i + p.maxBarsToEntry);
+    if (hours) {   // an unfilled order is cancelled when the session ends
+      let e = armed.at;
+      while (e + 1 < n && hours[e + 1] >= p.session[0] && hours[e + 1] < p.session[1] && e + 1 - armed.at < 400) e++;
+      expiresAt = Math.min(expiresAt, e);
+    }
+    const s = { ...base, tp: armed.tp, rr: armed.rr, armedAt: armed.at, expiresAt, status: 'armed' };
     s.result = simulateTrade(c, { dir: 'short', entry: s.entry, sl: s.sl, tp: s.tp, armedAt: s.armedAt, expiresAt: s.expiresAt }, { costR: p.costR, maxBarsInTrade: p.maxBarsInTrade });
     s.status = s.result.status;
     setups.push(s);
@@ -233,9 +253,21 @@ export function findSetups(candles, params = {}) {
   const A = atr(candles, 14);
   const bias = p.bias === 'htf' ? htfBias(candles, p.htfFactor) : null;
 
-  const bear = detectBearish(candles, p, A, pivots(candles, p.pivotK)).map(s => ({ ...s, dir: 'short' }));
+  const hours = p.session ? candles.map(c => nyClock(c.t).hour) : null;
+  let refsBear = null, refsBull = null;
+  if (p.refLevels) {
+    const rl = referenceLevels(candles);
+    const cross = (list, sign) => list.map(r => {
+      let x = r.knownAt;
+      while (x < candles.length && x < r.knownAt + p.sweepLookback && !(sign > 0 ? candles[x].h > r.price : candles[x].l < r.price)) x++;
+      return { ...r, price: sign * r.price, cross: x < candles.length && x < r.knownAt + p.sweepLookback ? x : -1 };
+    });
+    refsBear = cross(rl.highs, 1);
+    refsBull = cross(rl.lows, -1);
+  }
+  const bear = detectBearish(candles, p, A, pivots(candles, p.pivotK), refsBear, hours).map(s => ({ ...s, dir: 'short' }));
   const m = mirror(candles);
-  const bull = detectBearish(m, p, A, pivots(m, p.pivotK)).map(s => ({ ...unmirror(s), dir: 'long' }));
+  const bull = detectBearish(m, p, A, pivots(m, p.pivotK), refsBull, hours).map(s => ({ ...unmirror(s), dir: 'long' }));
 
   let all = [...bear, ...bull];
   if (bias) {

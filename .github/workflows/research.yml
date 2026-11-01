@@ -1,5 +1,5 @@
 # Research data: multi-year Dukascopy candles for honest backtests of the course rules.
-# Runs only when research/ changes or by hand. Output goes to the research-data branch.
+# Runs only when research/ changes or by hand. One job per symbol, each saved to its own branch.
 name: research-data
 
 on:
@@ -11,25 +11,33 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: research
+  cancel-in-progress: true
+
 jobs:
   download:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        symbol: [XAUUSD, EURUSD, GBPUSD, USA30IDXUSD, USATECHIDXUSD]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
       - name: Download Dukascopy M1 -> 5m
-        run: python research/dukascopy.py 2022-11-01 2026-10-31
-      - name: Save to the research-data branch
+        run: python -u research/dukascopy.py 2022-11-01 2026-10-31 ${{ matrix.symbol }}
+      - name: Save to its research branch
         run: |
           cd duka
-          git init -q -b research-data
+          git init -q -b research-${{ matrix.symbol }}
           git config user.name davinci-bot
           git config user.email actions@users.noreply.github.com
           git add -A
-          git commit -q -m "dukascopy 5m $(date -u +%F)"
-          git push -f -q "https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}" research-data
+          git commit -q -m "dukascopy 5m ${{ matrix.symbol }} $(date -u +%F)"
+          git push -f -q "https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}" research-${{ matrix.symbol }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

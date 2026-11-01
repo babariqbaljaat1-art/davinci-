@@ -175,3 +175,54 @@ export function resample(candles, seconds) {
   if (cur) out.push(cur);
   return out;
 }
+
+// ---------- New York clock (sessions) ----------
+const _nyCache = new Map();
+const _nyFmt = typeof Intl !== 'undefined'
+  ? new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', hour12: false, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+  : null;
+/**
+ * New York local time for a unix timestamp: { hour (decimal), date: 'YYYY-MM-DD', tradeDay }.
+ * tradeDay rolls over at 17:00 New York (forex/futures day), so the evening Asia session
+ * belongs to the next trading day.
+ */
+export function nyClock(t) {
+  const hourKey = Math.floor(t / 3600);
+  let base = _nyCache.get(hourKey);
+  if (!base) {
+    const parts = Object.fromEntries(_nyFmt.formatToParts(new Date(hourKey * 3600 * 1000)).map(p => [p.type, p.value]));
+    const h = +parts.hour % 24;
+    const d = `${parts.year}-${parts.month}-${parts.day}`;
+    const next = new Date(Date.UTC(+parts.year, +parts.month - 1, +parts.day) + 86400000).toISOString().slice(0, 10);
+    base = { h, d, tradeDay: h >= 17 ? next : d };
+    _nyCache.set(hourKey, base);
+  }
+  return { hour: base.h + (t % 3600) / 3600, date: base.d, tradeDay: base.tradeDay };
+}
+
+/**
+ * Session reference levels ("liquidity from the left"): previous trading day high/low,
+ * Asia (19:00-24:00 NY) and London (02:00-05:00 NY) highs/lows. Each level is known from
+ * `knownAt` (the first bar after its window closed).
+ */
+export function referenceLevels(candles) {
+  const highs = [], lows = [];
+  let day = null, dayH = -Infinity, dayL = Infinity, dayEnd = -1;
+  let win = null, wH = -Infinity, wL = Infinity, wEnd = -1;
+  const windowOf = h => (h >= 19 ? 'asia' : h >= 2 && h < 5 ? 'london' : null);
+  for (let i = 0; i < candles.length; i++) {
+    const c = candles[i], k = nyClock(c.t);
+    if (k.tradeDay !== day) {
+      if (day !== null && dayEnd >= 0) { highs.push({ price: dayH, knownAt: i, kind: 'PDH' }); lows.push({ price: dayL, knownAt: i, kind: 'PDL' }); }
+      day = k.tradeDay; dayH = -Infinity; dayL = Infinity;
+    }
+    dayH = Math.max(dayH, c.h); dayL = Math.min(dayL, c.l); dayEnd = i;
+    const w = windowOf(k.hour);
+    if (w !== win) {
+      if (win && wEnd >= 0) { highs.push({ price: wH, knownAt: i, kind: win + 'H' }); lows.push({ price: wL, knownAt: i, kind: win + 'L' }); }
+      win = w; wH = -Infinity; wL = Infinity; wEnd = -1;
+    }
+    if (w) { wH = Math.max(wH, c.h); wL = Math.min(wL, c.l); wEnd = i; }
+  }
+  return { highs, lows };
+}
