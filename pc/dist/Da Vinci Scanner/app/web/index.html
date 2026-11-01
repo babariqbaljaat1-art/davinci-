@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Da Vinci Scanner</title>
+<meta name="description" content="Scans your markets for the Inter Equity Da Vinci setup and marks entry, stop, target and RR.">
+<meta name="theme-color" content="#0f1216" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f6f7f9" media="(prefers-color-scheme: light)">
+<link rel="icon" href="icons/icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<a class="skip" href="#live">Skip to live setups</a>
+<header class="top">
+  <div class="brand">
+    <img src="icons/icon-192.png" alt="" width="28" height="28">
+    <h1 translate="no">Da Vinci Scanner</h1>
+  </div>
+  <div class="status">
+    <span class="dot" id="dot" aria-hidden="true"></span>
+    <span id="updated" class="muted">Loading…</span>
+    <button class="icon-btn" id="settings-btn" type="button" aria-label="Settings" hidden>
+      <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M19.4 13a7.6 7.6 0 0 0 0-2l2-1.6-2-3.4-2.4 1a7.4 7.4 0 0 0-1.7-1L15 3.5h-4l-.4 2.5a7.4 7.4 0 0 0-1.7 1l-2.4-1-2 3.4L6.6 11a7.6 7.6 0 0 0 0 2l-2 1.6 2 3.4 2.4-1c.5.4 1.1.7 1.7 1l.4 2.5h4l.4-2.5c.6-.3 1.2-.6 1.7-1l2.4 1 2-3.4-2-1.6ZM13 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7Z" transform="translate(-1 0)"/></svg>
+    </button>
+    <button class="icon-btn" id="refresh" type="button" aria-label="Refresh data">
+      <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M12 5V2L8 6l4 4V7a5 5 0 1 1-5 5H5a7 7 0 1 0 7-7Z"/></svg>
+    </button>
+  </div>
+</header>
+
+<nav class="markets" id="markets" role="tablist" aria-label="Markets"></nav>
+
+<main class="layout">
+  <section class="card chart-card" id="panel" role="tabpanel" aria-labelledby="sym">
+    <div class="chart-head">
+      <div class="title">
+        <h2 id="sym" translate="no">–</h2>
+        <span class="chip" id="tfname"></span>
+        <span class="ohlc" id="ohlc" translate="no"></span>
+      </div>
+      <div class="tools" role="group" aria-label="Chart controls">
+        <button class="icon-btn" type="button" data-zoom="out" aria-label="Zoom out">−</button>
+        <button class="icon-btn" type="button" data-zoom="in" aria-label="Zoom in">+</button>
+        <button class="btn-ghost" type="button" id="fit">Latest</button>
+        <button class="btn-ghost" type="button" id="history" aria-pressed="false">History</button>
+      </div>
+    </div>
+    <div class="chart-wrap">
+      <canvas id="chart" role="img" tabindex="0" aria-label="Price chart with Da Vinci setups marked. Arrow keys pan, plus and minus zoom."></canvas>
+      <div class="empty" id="chart-empty" hidden></div>
+    </div>
+    <ul class="legend" aria-label="Chart legend">
+      <li><i class="sw lb"></i>Liquidity block</li>
+      <li><i class="sw risk"></i>Stop</li>
+      <li><i class="sw reward"></i>Target</li>
+      <li><i class="sw target"></i>Opposing liquidity</li>
+      <li><i class="sw dotb"></i>Buildup</li>
+    </ul>
+  </section>
+
+  <aside class="side">
+    <section class="card" aria-labelledby="live-h">
+      <div class="section-head">
+        <h2 id="live-h">Live setups</h2>
+        <button class="btn-ghost" type="button" id="notify">Phone alerts on karo</button>
+      </div>
+      <div id="live" class="live" tabindex="-1"></div>
+    </section>
+
+    <section class="card" aria-labelledby="bt-h">
+      <div class="section-head">
+        <h2 id="bt-h">Backtest</h2>
+        <span class="muted small" id="bt-range"></span>
+      </div>
+      <p class="verdict" id="verdict"></p>
+      <div class="kpis" id="kpis"></div>
+      <canvas class="equity" id="equity" aria-label="Equity curve in R"></canvas>
+      <div class="split" id="split"></div>
+      <div class="mc" id="mc"></div>
+      <details class="more">
+        <summary>Recent trades</summary>
+        <div class="table-wrap"><table id="trades"><thead><tr><th scope="col">Date</th><th scope="col">Side</th><th scope="col" class="num">RR</th><th scope="col" class="num">Result</th></tr></thead><tbody></tbody></table></div>
+      </details>
+      <details class="more">
+        <summary>Robustness (nearby settings)</summary>
+        <div class="table-wrap"><table id="grid"><thead><tr><th scope="col">Swing</th><th scope="col">Entry</th><th scope="col" class="num">Min RR</th><th scope="col">Bias</th><th scope="col" class="num">Trades</th><th scope="col" class="num">R/trade</th></tr></thead><tbody></tbody></table></div>
+      </details>
+    </section>
+  </aside>
+
+  <section class="card research" aria-labelledby="res-h">
+    <h2 id="res-h">Research: 4 saal, 5 markets</h2>
+    <p class="small muted" id="res-intro">Loading…</p>
+    <div class="table-wrap"><table id="res-table"><thead><tr><th scope="col">TF</th><th scope="col">Rules</th><th scope="col" class="num">Settings +</th><th scope="col" class="num">Pehle 70%</th><th scope="col" class="num">Baad ke 30% (unseen)</th></tr></thead><tbody></tbody></table></div>
+    <ul class="small muted res-notes" id="res-notes"></ul>
+    <p class="small muted">Har line mein wo setting dikhayi gayi hai jo sirf pehle 70% data par sabse achhi thi, aur phir usi ka result unseen 30% data par. "Settings +" = kitni settings pehle 70% par positive thi (100+ trades ke saath).</p>
+  </section>
+
+  <section class="card rules" aria-labelledby="rules-h">
+    <h2 id="rules-h">Da Vinci rules (jo software check karta hai)</h2>
+    <ol class="steps-explain">
+      <li><strong>Liquidity block banta hai.</strong> Price kisi purane high/low ki liquidity leta hai (sweep), phir foran displacement deta hai: previous candle ke low/high ke paar close, ya imbalance (FVG). Wo high/low LB hai.</li>
+      <li><strong>LB ke neeche buildup.</strong> Price pichla low tod deti hai (BOS, early sellers induce hote hain), phir LB se neeche lower high banati hai. Bullish mein ye ulta hota hai.</li>
+      <li><strong>Lows par liquidity engineer hoti hai.</strong> Neeche wala low respect hota hai (baad wala low us se upar rehta hai), to uske neeche liquidity rehti hai. Yahi target hai.</li>
+      <li><strong>Buildup liya, entry.</strong> Price buildup highs le kar LB mein aati hai: wahan sell. Stop LB ke upar, target lows. RR kam az kam 1:3 hona chahiye.</li>
+    </ol>
+    <p class="muted small">Setup cancel ho jata hai agar price LB ke upar close kare, entry se pehle lows le le, ya bohot der lage. Yeh course ki ek mechanical approximation hai. Discretionary cheezein (HTF narrative, "feel") isme poori nahi aatin.</p>
+  </section>
+</main>
+
+<footer class="foot">
+  <p>Educational tool. Financial advice nahi. Backtest future profit ki guarantee nahi deta. Data: Yahoo Finance (gold/indices futures ~10 min delayed, forex near real-time), jo broker prices se thoda alag ho sakta hai.</p>
+</footer>
+
+<dialog id="settings" aria-labelledby="set-h">
+  <form id="set-form" method="dialog">
+    <h2 id="set-h">Settings</h2>
+    <fieldset><legend>Markets</legend><div class="opts" id="set-markets"></div></fieldset>
+    <fieldset><legend>Timeframes</legend><div class="opts" id="set-tfs"></div></fieldset>
+    <label class="field">Rules
+      <select id="set-strategy" name="strategy"></select>
+    </label>
+    <label class="opt"><input type="checkbox" id="set-edge" name="requireEdge"> Alert sirf tab jab backtest (aur unseen data) positive ho</label>
+    <label class="opt"><input type="checkbox" id="set-auto" name="autoStart"> Windows start hote hi scanner chalao (tray mein)</label>
+    <fieldset><legend>Telegram alerts (phone par)</legend>
+      <label class="field">Bot token <input id="set-token" name="token" type="password" autocomplete="off" spellcheck="false" placeholder="123456:ABC…"></label>
+      <label class="field">Chat id <input id="set-chat" name="chat" type="text" inputmode="numeric" autocomplete="off" spellcheck="false" placeholder="123456789…"></label>
+      <button class="btn-ghost" type="button" id="set-test">Test message bhejo</button>
+    </fieldset>
+    <p class="small" id="set-error" role="status" aria-live="polite"></p>
+    <div class="dlg-actions">
+      <button class="btn-ghost" type="button" id="set-quit">Scanner band karo</button>
+      <span class="spacer"></span>
+      <button class="btn-ghost" type="button" id="set-cancel">Cancel</button>
+      <button class="btn-primary" type="submit">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script type="module" src="pc-provider.js"></script>
+<script type="module" src="app.js"></script>
+</body>
+</html>

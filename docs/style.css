@@ -228,7 +228,7 @@ h1 { white-space: nowrap; }
 }
 
 /* settings dialog (PC app) */
-dialog { border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); color: var(--text); padding: 18px; width: min(520px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); overflow: auto; }
+dialog { border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); color: var(--text); padding: 18px; width: min(520px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); overflow: auto; overscroll-behavior: contain; }
 dialog::backdrop { background: rgba(0, 0, 0, 0.5); }
 dialog h2 { margin-bottom: 12px; }
 fieldset { border: 1px solid var(--border); border-radius: 10px; margin: 0 0 12px; padding: 10px 12px; }
@@ -236,8 +236,8 @@ legend { font-size: 0.8rem; color: var(--muted); padding: 0 4px; }
 .opts { display: flex; flex-wrap: wrap; gap: 6px 14px; }
 .opt { display: inline-flex; align-items: center; gap: 8px; font-size: 0.88rem; min-height: 32px; margin-bottom: 6px; }
 .opt input { width: 18px; height: 18px; accent-color: var(--accent); }
-.field { display: grid; gap: 4px; font-size: 0.8rem; color: var(--muted); margin-bottom: 10px; }
-.field input, .field select { font: inherit; font-size: 16px; color: var(--text); background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; min-height: 40px; }
+.field { display: grid; grid-template-columns: minmax(0, 1fr); gap: 4px; font-size: 0.8rem; color: var(--muted); margin-bottom: 10px; }
+.field input, .field select { font: inherit; font-size: 16px; color: var(--text); background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; min-height: 40px; width: 100%; min-width: 0; }
 .field input:focus-visible, .field select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .dlg-actions { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
 .dlg-actions .spacer { flex: 1; }

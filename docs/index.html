@@ -125,11 +125,11 @@
     <label class="field">Rules
       <select id="set-strategy" name="strategy"></select>
     </label>
-    <label class="opt"><input type="checkbox" id="set-edge"> Alert sirf tab jab backtest (aur unseen data) positive ho</label>
-    <label class="opt"><input type="checkbox" id="set-auto"> Windows start hote hi scanner chalao (tray mein)</label>
+    <label class="opt"><input type="checkbox" id="set-edge" name="requireEdge"> Alert sirf tab jab backtest (aur unseen data) positive ho</label>
+    <label class="opt"><input type="checkbox" id="set-auto" name="autoStart"> Windows start hote hi scanner chalao (tray mein)</label>
     <fieldset><legend>Telegram alerts (phone par)</legend>
       <label class="field">Bot token <input id="set-token" name="token" type="password" autocomplete="off" spellcheck="false" placeholder="123456:ABC…"></label>
-      <label class="field">Chat id <input id="set-chat" name="chat" type="text" inputmode="numeric" autocomplete="off" spellcheck="false" placeholder="123456789"></label>
+      <label class="field">Chat id <input id="set-chat" name="chat" type="text" inputmode="numeric" autocomplete="off" spellcheck="false" placeholder="123456789…"></label>
       <button class="btn-ghost" type="button" id="set-test">Test message bhejo</button>
     </fieldset>
     <p class="small" id="set-error" role="status" aria-live="polite"></p>

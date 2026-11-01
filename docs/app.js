@@ -273,6 +273,7 @@ async function renderResearch() {
     $('#res-intro').textContent = `${r.markets.join(', ')} · ${d(r.from)} – ${d(r.to)} · ${r.configs} settings · ${r.trades.toLocaleString()} trades simulate hui (spread + cost ke saath). Jo settings pehle 70% aur unseen 30% data, dono par positive rahi: ${r.positiveBoth}.`;
     const cell = (n, e) => `${n} tr · <span class="${e >= 0 ? 'pos' : 'neg'}">${rTxt(e)}</span>`;
     $('#res-notes').innerHTML = (r.notes || []).map(n => `<li>${esc(n)}</li>`).join('');
+    $('#res-notes').hidden = !(r.notes || []).length;
     $('#res-table tbody').innerHTML = r.rows.map(x => `<tr><td translate="no">${x.tf}</td><td>${esc(x.label)}</td><td class="num">${x.positiveIS}/${x.settings}</td><td class="num">${cell(x.isTrades, x.isExp)}</td><td class="num">${cell(x.oosTrades, x.oosExp)}</td></tr>`).join('');
   } catch { $('#res-intro').textContent = 'Research data nahi mila.'; }
 }
