@@ -54,6 +54,10 @@ async function main() {
       try {
         const candles = await fetchCandles(m, tf);
         if (candles.length < 200) throw new Error(`only ${candles.length} candles`);
+        if (process.env.SAVE_RAW) {
+          await mkdir(`${ROOT}raw`, { recursive: true });
+          await writeFile(`${ROOT}raw/${key}.json`, JSON.stringify(candles));
+        }
         const digits = m.digits ?? 2;
         const setups = findSetups(candles, cfg.params);
         const bt = backtest(candles, cfg.params, { mcRuns: 5000 });

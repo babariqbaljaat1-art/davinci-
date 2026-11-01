@@ -47,6 +47,15 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           TWELVEDATA_API_KEY: ${{ secrets.TWELVEDATA_API_KEY }}
+          SAVE_RAW: ${{ github.event_name != 'schedule' && '1' || '' }}
+
+      # raw candles for research (manual / push runs only)
+      - if: github.event_name != 'schedule'
+        uses: actions/upload-artifact@v4
+        with:
+          name: raw-candles
+          path: raw/
+          retention-days: 3
 
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
