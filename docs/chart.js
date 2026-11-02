@@ -9,6 +9,8 @@ export class Chart {
     this.ctx = canvas.getContext('2d');
     this.candles = [];
     this.setups = [];
+    this.liquidity = [];     // Marco's "$$$" rays: highs/lows a later high/low respected
+    this.sessions = [];      // today's PDH/PDL, Asia, London levels
     this.focusId = null;
     this.spacing = 8;        // px per bar
     this.offset = 0;         // bars scrolled back into history (negative = empty space right of the last bar)
@@ -21,10 +23,12 @@ export class Chart {
     this.resize();
   }
 
-  setData({ candles, setups, digits, tfSeconds }) {
+  setData({ candles, setups, digits, tfSeconds, liquidity, sessions }) {
     const first = !this.candles.length;
     this.candles = candles.map(([t, o, h, l, c]) => ({ t, o, h, l, c }));
     this.setups = setups || [];
+    this.liquidity = liquidity || [];
+    this.sessions = sessions || [];
     this.digits = digits ?? 2;
     this.tf = tfSeconds || 900;
     if (first) this.fit();
@@ -35,9 +39,16 @@ export class Chart {
     this.focusId = id;
     const s = this.setups.find(x => x.id === id);
     if (s) {
-      // put the liquidity block ~30% from the left edge
-      const i = this.indexOf(s.lb.t);
-      this.offset = this.candles.length - 1 - i + 0.5 - this.visibleBars() * 0.7;
+      // put the liquidity block ~30% from the left edge, but keep the order and its label in view
+      const last = this.candles.length - 1, i = this.indexOf(s.lb.t);
+      const at = s.fillT || s.armedT;
+      const room = () => Math.ceil(130 / this.spacing);
+      if (at != null) {
+        const span = this.indexOf(at) - i + room() + 8;
+        if (span > this.visibleBars() * 0.95) this.spacing = Math.max(2, (this.plotW() * 0.95) / (this.indexOf(at) - i + 8 + 130 / 2));
+      }
+      this.offset = last - i + 0.5 - this.visibleBars() * 0.7;
+      if (at != null) this.offset = Math.min(this.offset, last - this.indexOf(at) + 0.5 - room());
       this.clampOffset();
     }
     this.draw();
@@ -46,7 +57,7 @@ export class Chart {
   fit() {
     const w = this.plotW();
     this.spacing = Math.max(3, Math.min(14, w / 140));
-    this.offset = -6;
+    this.offset = -Math.max(6, Math.ceil(120 / this.spacing));   // room on the right for the order label and session levels
     this.draw();
   }
 
@@ -209,6 +220,7 @@ export class Chart {
     ctx.beginPath(); ctx.rect(0, 0, W, H); ctx.clip();
 
     // overlays under candles
+    this._drawLiquidity(col, false);
     for (const s of this.setups) this._drawSetup(s, col, s.id === this.focusId, false);
 
     // candles
@@ -223,6 +235,7 @@ export class Chart {
     }
 
     // labels on top of candles
+    this._drawLiquidity(col, true);
     for (const s of this.setups) this._drawSetup(s, col, s.id === this.focusId, true);
 
     // last price line
@@ -244,6 +257,40 @@ export class Chart {
     if (this.hover && this.hover.y < H) tag(ctx, W, this.hover.y, fmt(this.yToPrice(this.hover.y), this.digits), col.muted, col.bg);
   }
 
+  // Marco's liquidity marks: "$$$" rays until taken (then dotted), and today's session levels
+  _drawLiquidity(col, labelsPass) {
+    const ctx = this.ctx, W = this.plotW();
+    const lastT = this.candles[this.candles.length - 1].t;
+    ctx.save();
+    ctx.globalAlpha = this.focusId ? 0.35 : 0.85;
+    ctx.font = '600 10px system-ui, sans-serif';
+    for (const L of this.liquidity) {
+      const x0 = this.timeToX(L.t), x1 = L.endT ? this.timeToX(L.endT) : W, y = Math.round(this.priceToY(L.price)) + 0.5;
+      if (x1 < 0 || x0 > W) continue;
+      if (!labelsPass) {
+        ctx.strokeStyle = col.target; ctx.lineWidth = 1; ctx.setLineDash(L.taken ? [1, 3] : []);
+        ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x1, y); ctx.stroke(); ctx.setLineDash([]);
+      } else if (!L.taken) {
+        ctx.textBaseline = L.high ? 'bottom' : 'top';
+        label(ctx, '$$$', this.timeToX(L.respT || L.t) - 8, y + (L.high ? -2 : 2), col.target);
+      }
+    }
+    for (const x of this.sessions) {
+      const x0 = Math.max(0, this.timeToX(x.t)), y = Math.round(this.priceToY(x.price)) + 0.5;
+      if (y < 0 || y > this.plotH()) continue;
+      const c = x.taken ? col.muted : col.target;
+      if (!labelsPass) {
+        ctx.strokeStyle = c; ctx.setLineDash(x.taken ? [1, 3] : [5, 4]);
+        ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(W, y); ctx.stroke(); ctx.setLineDash([]);
+      } else {
+        ctx.textBaseline = 'bottom';
+        const txt = `${x.name} ${x.taken ? 'taken' : '$$$'}`;
+        label(ctx, txt, Math.min(W - ctx.measureText(txt).width - 4, this.timeToX(lastT) + 6), y - 2, c);
+      }
+    }
+    ctx.restore();
+  }
+
   _drawSetup(s, col, focused, labelsPass) {
     const ctx = this.ctx;
     const active = s.status === 'pending' || s.status === 'open';
@@ -258,12 +305,21 @@ export class Chart {
     ctx.globalAlpha = alpha;
 
     const yTop = this.priceToY(s.lb.top), yBot = this.priceToY(s.lb.bottom);
+    const marco = s.model === 'pivot' || s.model === 'candle4';
+    const up = s.dir === 'long';
     if (!labelsPass) {
-      // liquidity run: dashed line from the swept high/low to the LB
+      // liquidity from the left that the LB ran: ray from the old high/low to the sweep, crossed out where it was taken
       if (s.swept) {
         const xs = this.timeToX(s.swept.t), y = this.priceToY(s.swept.price);
         ctx.strokeStyle = col.muted; ctx.setLineDash([4, 3]); ctx.lineWidth = 1;
         ctx.beginPath(); ctx.moveTo(xs, y); ctx.lineTo(x0, y); ctx.stroke(); ctx.setLineDash([]);
+        ctx.beginPath(); ctx.moveTo(x0 - 3, y - 3); ctx.lineTo(x0 + 3, y + 3); ctx.moveTo(x0 - 3, y + 3); ctx.lineTo(x0 + 3, y - 3); ctx.stroke();
+      }
+      // runner target (next liquidity beyond the first target)
+      if (s.mgmt?.t2 != null && s.tp != null && (s.armedT || s.fillT)) {
+        const y = this.priceToY(s.mgmt.t2), xa = this.timeToX(s.fillT || s.armedT);
+        ctx.strokeStyle = col.target; ctx.setLineDash([2, 4]);
+        ctx.beginPath(); ctx.moveTo(xa, y); ctx.lineTo(x1, y); ctx.stroke(); ctx.setLineDash([]);
       }
       // liquidity block zone
       const lbEnd = s.fillT ? this.timeToX(s.fillT) : x1;
@@ -273,7 +329,7 @@ export class Chart {
       ctx.strokeRect(x0 - this.spacing / 2 + 0.5, Math.min(yTop, yBot) + 0.5, lbEnd - x0 + this.spacing / 2, Math.abs(yBot - yTop));
       // opposing liquidity (target)
       if (s.extreme) {
-        const y = this.priceToY(s.extreme.price), xe = this.timeToX(s.extreme.t);
+        const y = this.priceToY(marco && s.tp != null ? s.tp : s.extreme.price), xe = this.timeToX(s.extreme.t);
         ctx.strokeStyle = col.target; ctx.setLineDash([6, 4]);
         ctx.beginPath(); ctx.moveTo(xe, y); ctx.lineTo(x1, y); ctx.stroke(); ctx.setLineDash([]);
       }
@@ -287,14 +343,18 @@ export class Chart {
       }
     } else {
       ctx.font = '600 10px system-ui, sans-serif'; ctx.textBaseline = 'bottom';
-      const up = s.dir === 'long';
       label(ctx, 'LB', x0 + 2, up ? Math.max(yTop, yBot) + 13 : Math.min(yTop, yBot) - 2, col.lbLine);
       for (const b of s.buildup || []) {
         const x = this.timeToX(b.t), y = this.priceToY(b.price);
-        ctx.fillStyle = col.accent; ctx.beginPath(); ctx.arc(x, y + (up ? 7 : -7), 2.5, 0, 7); ctx.fill();
+        if (marco) label(ctx, '$$$', x - 8, y + (up ? 13 : -3), col.target);   // early traders' stops beyond the inducement point
+        else { ctx.fillStyle = col.accent; ctx.beginPath(); ctx.arc(x, y + (up ? 7 : -7), 2.5, 0, 7); ctx.fill(); }
       }
-      if (s.bos) label(ctx, 'BOS', this.timeToX(s.bos.t) + 2, this.priceToY(s.bos.price) + (up ? -2 : 12), col.muted);
-      if (s.respected) label(ctx, 'liq', this.timeToX(s.respected.t) - 6, this.priceToY(s.respected.price) + (up ? -4 : 13), col.target);
+      if (marco && s.model === 'pivot' && s.extreme && s.buildup?.length) {
+        label(ctx, up ? 'buyers induced' : 'sellers induced', this.timeToX(s.extreme.t) - 24, this.priceToY(s.extreme.price) + (up ? -4 : 13), col.muted);
+      }
+      if (s.bos && !marco) label(ctx, 'BOS', this.timeToX(s.bos.t) + 2, this.priceToY(s.bos.price) + (up ? -2 : 12), col.muted);
+      if (s.respected && !marco) label(ctx, '$$$', this.timeToX(s.respected.t) - 8, this.priceToY(s.respected.price) + (up ? -4 : 13), col.target);
+      if (marco && s.fillT) label(ctx, up ? 'buyers trapped' : 'sellers trapped', this.timeToX(s.fillT) + 4, this.priceToY(s.entry) + (up ? 27 : -16), up ? col.up : col.down);
       if (s.tp != null && (s.armedT || s.fillT)) {
         const xa = this.timeToX(s.fillT || s.armedT);
         const txt = `${s.dir === 'short' ? 'SELL' : 'BUY'}  RR 1:${(s.rr ?? 0).toFixed(1)}${s.r != null && ['win', 'loss'].includes(s.status) ? `  ${s.r > 0 ? '+' : ''}${s.r}R` : ''}`;

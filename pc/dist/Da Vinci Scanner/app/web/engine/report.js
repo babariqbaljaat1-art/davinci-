@@ -2,8 +2,22 @@
 // Shared by the cloud scanner (Node) and the PC app (browser).
 import { findSetups } from './davinci.js';
 import { backtest, robustness } from './backtest.js';
+import { liquidityLevels, sessionLevels } from './marco.js';
 
 const LIVE = new Set(['forming', 'pending', 'open']);
+
+/** Display names of the entry models (s.model). */
+export const MODEL_NAME = { davinci: 'Da Vinci', pivot: 'Marco: LB + liquidity taken', candle4: 'Marco 4-candle' };
+
+/** One line for an alert: what the order is waiting for. */
+export function waitingText(s) {
+  if (s.status === 'open') return 'Entry ho chuki (trade open)';
+  if (s.model === 'pivot' || s.model === 'candle4') {
+    const who = s.dir === 'short' ? 'sellers' : 'buyers', hl = s.dir === 'short' ? 'high' : 'low';
+    return `Limit order inducement ${hl} par: jaise hi wo ${hl} stab ho, entry (${who} trapped)`;
+  }
+  return 'Limit order: price abhi entry tak nahi aayi';
+}
 const round = (v, d) => (v == null ? v : +v.toFixed(d));
 
 export function serializeSetup(s, c, digits) {
@@ -11,7 +25,7 @@ export function serializeSetup(s, c, digits) {
   const P = v => round(v, digits + 1);
   const r = s.result || {};
   return {
-    id: s.id, dir: s.dir, status: s.status,
+    id: s.id, dir: s.dir, status: s.status, model: s.model || 'davinci',
     lb: { t: s.lb.t, top: P(s.lb.top), bottom: P(s.lb.bottom), level: P(s.lb.level) },
     swept: s.swept && { t: s.swept.t, price: P(s.swept.price) },
     bos: s.bos && { t: T(s.bos.i), price: P(s.bos.price) },
@@ -49,8 +63,15 @@ export function buildReport(market, tf, candles, params, { chartBars = 600, mcRu
     .filter(s => LIVE.has(s.status) || (s.result && s.lb.i >= firstChart))
     .filter(s => s.lb.i >= firstChart - 50)
     .map(s => serializeSetup(s, candles, digits));
+  // Marco's marks: respected highs/lows still on the chart, and today's session levels
+  const T = i => candles[Math.min(i, candles.length - 1)].t, P = v => round(v, digits + 1);
+  const liquidity = liquidityLevels(candles, { k: params.pivotK || 3 })
+    .filter(L => L.endAt == null || L.endAt >= firstChart).slice(-60)
+    .map(L => ({ t: T(L.i), price: P(L.price), high: L.high, respT: T(L.respAt), endT: L.endAt == null ? null : T(L.endAt), taken: L.taken }));
+  const sessions = sessionLevels(candles).map(x => ({ name: x.name, price: P(x.price), t: T(x.i), taken: x.taken }));
   return {
     market, tf, key: `${market.id}_${tf}`, updated: updated ?? Math.floor(Date.now() / 1000), params: bt.params,
+    liquidity, sessions,
     lastPrice: candles[candles.length - 1].c,
     candles: candles.slice(firstChart).map(c => [c.t, round(c.o, digits + 1), round(c.h, digits + 1), round(c.l, digits + 1), round(c.c, digits + 1)]),
     setups: shown,

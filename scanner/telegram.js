@@ -1,5 +1,6 @@
 // Telegram alerts. Needs repository secrets TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID.
 import { IE_LABELS } from '../docs/engine/ierules.js';
+import { MODEL_NAME, waitingText } from '../docs/engine/report.js';
 const fmt = (v, d) => (v == null ? '-' : Number(v).toFixed(d));
 const pct = v => `${Math.round((v || 0) * 100)}%`;
 
@@ -17,12 +18,12 @@ export async function sendTelegram(text) {
 export function setupMessage(m, tf, s, bt, appUrl) {
   const d = (m.digits ?? 2) + 1;
   const side = s.dir === 'short' ? '🔴 SELL' : '🟢 BUY';
-  const state = s.status === 'open' ? 'Entry trigger ho chuki (trade open)' : 'Limit order: price abhi entry tak nahi aayi';
+  const state = waitingText(s);
   const a = bt.all, o = bt.outOfSample, mc = bt.monteCarlo;
   const g = s.ie?.grade;
   const issues = (s.ie?.checks || []).filter(c => c[1] === 'warn').map(c => `⚠️ ${IE_LABELS[c[0]] || c[0]}${c[2] ? ' (' + c[2] + ')' : ''}`);
   return [
-    `<b>${side} — ${m.id} ${tf} — Da Vinci${g ? ` — IE grade ${g}` : ''}</b>`,
+    `<b>${side} — ${m.id} ${tf} — ${MODEL_NAME[s.model] || 'Da Vinci'}${g ? ` — IE grade ${g}` : ''}</b>`,
     g ? (g === 'A' ? 'Saare IE rules theek: poora risk' : 'Core rules theek, kuch warning: aadha risk') : '',
     state,
     ``,

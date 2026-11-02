@@ -1,5 +1,6 @@
 import { Chart, drawEquity, fmt } from './chart.js';
 import { IE_LABELS, IE_GROUPS } from './engine/ierules.js';
+import { MODEL_NAME } from './engine/report.js';
 
 const TF_SEC = { '5m': 300, '15m': 900, '30m': 1800, '1h': 3600, '4h': 14400, '1d': 86400 };
 const STATE_TEXT = {
@@ -124,7 +125,7 @@ async function select(key, user, keepView = false) {
   $('#chart-empty').hidden = true;
   $('#sym').textContent = `${data.market.id} · ${data.market.name}`;
   $('#tfname').textContent = data.tf;
-  chart.setData({ candles: data.candles, setups: visibleSetups(), digits: digitsOf(data.market), tfSeconds: TF_SEC[data.tf] });
+  chart.setData({ candles: data.candles, setups: visibleSetups(), digits: digitsOf(data.market), tfSeconds: TF_SEC[data.tf], liquidity: data.liquidity, sessions: data.sessions });
   if (pendingFocus && data.setups.some(s => s.id === pendingFocus)) {
     toggleHistory(true);
     chart.focus(pendingFocus);
@@ -155,6 +156,15 @@ function showOHLC(c) {
   $('#ohlc').textContent = `O ${fmt(k.o, d)}  H ${fmt(k.h, d)}  L ${fmt(k.l, d)}  C ${fmt(k.c, d)}`;
 }
 
+// what a Marco-model order is waiting for, in his words
+function marcoState(s) {
+  if (s.model !== 'pivot' && s.model !== 'candle4') return '';
+  const hl = s.dir === 'short' ? 'high' : 'low', who = s.dir === 'short' ? 'sellers' : 'buyers';
+  if (s.status === 'forming') return `LB ban gaya: inducement ${hl} stab hone ka intezar`;
+  if (s.status === 'pending') return `${s.dir === 'short' ? 'Sell' : 'Buy'} limit inducement ${hl} par: stab hote hi entry (${who} trapped)`;
+  return '';
+}
+
 function renderLive() {
   const d = digitsOf(data.market);
   const live = data.setups.filter(s => (s.status === 'pending' || s.status === 'open') && !s.skip).reverse();
@@ -180,8 +190,9 @@ function renderLive() {
         <span class="side-pill ${s.dir}">${s.dir === 'short' ? 'SELL' : 'BUY'}</span>
         <strong translate="no">${esc(data.market.id)}&nbsp;${esc(data.tf)}</strong>
         ${grade}
-        <span class="state">${STATE_TEXT[s.status] || s.status}</span>
+        <span class="state">${marcoState(s) || STATE_TEXT[s.status] || s.status}</span>
       </div>
+      ${s.model && s.model !== 'davinci' ? `<p class="model-tag small muted" translate="no">${esc(MODEL_NAME[s.model] || s.model)}</p>` : ''}
       ${lv}
       ${s.tp != null && !s.skip ? planHTML(s, d) : ''}
       ${ie ? steps : `<ul class="checks">${steps}</ul>`}

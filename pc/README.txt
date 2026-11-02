@@ -21,7 +21,8 @@ SETTINGS (upar gear icon)
 -------------------------
 - Markets: XAUUSD, NAS100, US30, EURUSD, GBPUSD, BTCUSD
 - Timeframes: 5m, 15m, 1h
-- Rules: "Inter Equity full rulebook" (default, neeche dekho), "New York session + session levels +
+- Rules: "Marco model: LB + liquidity taken" (default, neeche dekho), "Marco model + 4-candle",
+  "Marco 4-candle only", "Da Vinci + Inter Equity rulebook", "New York session + session levels +
   daily bias" (case studies wala tareeqa), "New York session only", ya "Classic" (har waqt)
 - "Alert sirf tab jab backtest positive ho": ON (default) = sirf un markets par phone/Telegram alert jahan
   backtest aur unseen data dono positive hon. Har IE A/B setup par alert chahiye to isay OFF karo.
@@ -30,6 +31,18 @@ SETTINGS (upar gear icon)
 - Telegram: @BotFather se bot banao, token yahan daalo; bot ko "hi" bhejo, phir
   https://api.telegram.org/bot<TOKEN>/getUpdates kholo, "chat":{"id":...} wala number = chat id.
   "Test message bhejo" se check karo.
+
+MARCO MODEL (default)
+---------------------
+Marco ki sab se zyada li gayi entry (case studies, webinars aur YouTube channel se):
+"I will always enter as soon as the liquidity is taken."
+1. Left ki liquidity (jo high/low baad mein respect hua) sweep ho -> wo high/low LIQUIDITY BLOCK (LB).
+2. LB se move retail ko induce karta hai ("sellers induced" / "buyers induced").
+3. Price LB ke andar inducement high/low banata hai ($$$ = early traders ke stops).
+4. Jaise hi wo stab ho ("sellers trapped"): entry. Stop LB ke paar, target wo liquidity jo move ne chhodi.
+4-candle model: candle 2 sweep + bari wick, candle 3, candle 4 candle 3 ka high/low le -> entry.
+Chart par Marco ke marks: $$$ lines (sirf respected highs/lows), PDH/PDL, Asia, London levels
+("taken" = le liye gaye), LB box, sellers/buyers induced, $$$, trapped.
 
 INTER EQUITY RULEBOOK (har setup par 20 rules)
 -----------------------------------------------
@@ -57,6 +70,8 @@ IMAANDAARI WALI BAATEIN
 - Phir poora Inter Equity rulebook (20 rules + IE management) bhi isi data par test hua:
   5m grade A+B 820 trades, win 14%, -0.17R/trade; sirf grade A -0.61R; 15m grade A+B -0.19R.
   Matlab: rules course jaise hain, lekin mechanical version ne 4 saal mein paisa nahi banaya.
+- Marco model (default) isi data par: 5m 509 trades, win 20%, -0.10R/trade (unseen 30%: +0.01R);
+  15m -0.22R. 4-candle model 5m -0.10R. Da Vinci se behtar, lekin mustaqil edge ab bhi nahi.
   Marco khud kehta hai uska strike rate 35-50% hai, 70-80% wale claims ko wo jhoot kehta hai.
   Isi liye "Alert sirf tab jab backtest positive ho" shuru se ON hai. Demo par forward test karo.
 - Backtest panel batata hai ke rules us market/timeframe par kaam kar rahe hain ya nahi. Negative ho to us par trade mat karo.

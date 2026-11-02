@@ -1,5 +1,5 @@
 // Shared by the PC app window (pc-provider.js) and the background scanner (worker.js).
-import { buildReport } from './engine/report.js';
+import { buildReport, MODEL_NAME, waitingText } from './engine/report.js';
 import { liveEvents } from './engine/calendar.js';
 import { IE_LABELS } from './engine/ierules.js';
 
@@ -12,12 +12,27 @@ export const MARKETS = {
   BTCUSD: { id: 'BTCUSD', name: 'Bitcoin', yahoo: 'BTC-USD', digits: 0, spread: 15, kind: 'fx', ccy: ['USD'] },
 };
 
-// Rule presets. "ie" = the full Inter Equity rulebook compiled from all 155 videos (checklist,
-// A/B grades, IE management, 2 trades / 2 losses a day). "session" follows the case studies
+// Rule presets. "marco" = the entry Marco takes most ("I will always enter as soon as the liquidity
+// is taken": LB, then the inducement high/low inside it is stabbed) with daily bias (who is induced),
+// the IE checklist and management. "marco4" adds his 4-candle sniper model. "ie" = the Da Vinci with
+// the full Inter Equity rulebook compiled from all 155 videos. "session" follows the case studies
 // (New York morning, session liquidity); "classic" is the plain 4-step Da Vinci on any hour.
+const MARCO = { model: 'marco', pivotK: 3, entryK: 2, insideLB: true, minRR: 3, marcoSlBufferATR: 0.5, marcoMinRiskATR: 1, costR: 0.02, session: [8, 11], bias: 'daily', ie: true, ieMin: 'B', manage: 'ie', maxTradesPerDay: 2, maxLossesPerDay: 2 };
 export const STRATEGIES = {
+  marco: {
+    label: 'Marco model: LB + liquidity taken (his most-taken entry, IE rules)',
+    params: MARCO,
+  },
+  marco4: {
+    label: 'Marco model + 4-candle sniper entries',
+    params: { ...MARCO, model: 'marco+candle4' },
+  },
+  candle4: {
+    label: 'Marco 4-candle sniper only',
+    params: { ...MARCO, model: 'candle4' },
+  },
   ie: {
-    label: 'Inter Equity full rulebook (20 rules, A/B grade, IE management)',
+    label: 'Da Vinci + Inter Equity rulebook (20 rules, A/B grade, IE management)',
     params: { pivotK: 3, entryMode: 'level', tpMode: 'liquidity', minRR: 3, slBufferATR: 0.3, minRiskATR: 0.5, costR: 0.02, session: [8, 11], ie: true, ieMin: 'B', manage: 'ie', maxTradesPerDay: 2, maxLossesPerDay: 2 },
   },
   session: {
@@ -37,8 +52,8 @@ export const STRATEGIES = {
 export const DEFAULT_CONFIG = {
   markets: ['XAUUSD', 'NAS100', 'US30'],
   timeframes: ['5m', '15m'],
-  strategy: 'ie',
-  rulesVersion: 2,
+  strategy: 'marco',
+  rulesVersion: 3,
   requireEdge: true,
   telegram: { token: '', chat: '' },
   autoStart: false,
@@ -53,9 +68,9 @@ export async function getConfig() {
   try {
     const r = await fetch('/api/config', { cache: 'no-store' });
     const c = await r.json();
-    // first start after the rulebook update: switch to the full Inter Equity rules once
-    if ((c.rulesVersion || 1) < 2) c.strategy = 'ie';
-    return { ...DEFAULT_CONFIG, ...c, rulesVersion: 2, telegram: { ...DEFAULT_CONFIG.telegram, ...(c.telegram || {}) } };
+    // first start after an update of the rules: switch to Marco's model once (the user can change it back)
+    if ((c.rulesVersion || 1) < 3) c.strategy = 'marco';
+    return { ...DEFAULT_CONFIG, ...c, rulesVersion: 3, telegram: { ...DEFAULT_CONFIG.telegram, ...(c.telegram || {}) } };
   } catch { return { ...DEFAULT_CONFIG }; }
 }
 
@@ -101,7 +116,7 @@ const cache = new Map();
 /** Report for one market/timeframe; rebuilt only when a new candle has closed. */
 export async function marketReport(cfg, id, tf, { full = false } = {}) {
   const market = MARKETS[id];
-  const base = (STRATEGIES[cfg.strategy] || STRATEGIES.ie).params;
+  const base = (STRATEGIES[cfg.strategy] || STRATEGIES.marco).params;
   const feed = base.ie ? await getNews() : null;
   const params = { ...base, kind: market.kind || 'fx', ieParams: { live: feed ? liveEvents(feed, market.ccy || ['USD']) : null } };
   const candles = await getCandles(market, tf);
@@ -125,9 +140,9 @@ export function alertText(report, s) {
     title: `${s.dir === 'short' ? 'SELL' : 'BUY'} ${report.market.id} ${report.tf}${g ? ' · IE ' + g : ''} · RR 1:${(s.rr ?? 0).toFixed(1)}`,
     body: `Entry ${f(s.entry)} · SL ${f(s.sl)} · TP ${f(s.tp)}`,
     text: [
-      `<b>${s.dir === 'short' ? '🔴 SELL' : '🟢 BUY'} — ${report.market.id} ${report.tf} — Da Vinci${g ? ` — IE grade ${g}` : ''}</b>`,
+      `<b>${s.dir === 'short' ? '🔴 SELL' : '🟢 BUY'} — ${report.market.id} ${report.tf} — ${MODEL_NAME[s.model] || 'Da Vinci'}${g ? ` — IE grade ${g}` : ''}</b>`,
       g ? (g === 'A' ? 'Saare IE rules theek: poora risk' : 'Core rules theek, kuch warning: aadha risk') : null,
-      s.status === 'open' ? 'Entry ho chuki (trade open)' : 'Limit order: price abhi entry tak nahi aayi',
+      waitingText(s),
       '', `Entry: <b>${f(s.entry)}</b>`, `Stop loss: <b>${f(s.sl)}</b>`, `Target (80% yahan): <b>${f(s.tp)}</b>`, `RR: <b>1:${(s.rr ?? 0).toFixed(1)}</b>`,
       s.mgmt?.t2 != null ? `Runner (20%): ${f(s.mgmt.t2)}` : null,
       ...issues, '',

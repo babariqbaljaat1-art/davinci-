@@ -45,11 +45,12 @@ export function backtest(candles, params = {}, { mcRuns = 5000, splitAt = 0.7 } 
  */
 export function robustness(candles, base = {}) {
   const grid = [];
+  const marco = base.model && base.model !== 'davinci';
   for (const pivotK of [2, 3, 4, 5])
-    for (const entryMode of ['level', 'mid', 'body'])
+    for (const entryMode of marco ? ['inside LB', 'any'] : ['level', 'mid', 'body'])
       for (const minRR of [2, 3, 4])
-        for (const bias of ['none', 'htf'])
-          grid.push({ ...base, pivotK, entryMode, minRR, bias });
+        for (const bias of marco ? ['none', 'daily', 'htf'] : ['none', 'htf'])
+          grid.push(marco ? { ...base, pivotK, entryMode, insideLB: entryMode === 'inside LB', minRR, bias } : { ...base, pivotK, entryMode, minRR, bias });
   return grid.map(p => {
     const trades = tradesFromSetups(findSetups(candles, p), { candles, maxPerDay: p.maxTradesPerDay || 0, maxLossesPerDay: p.maxLossesPerDay || 0 }).filter(closed);
     const s = stats(trades);

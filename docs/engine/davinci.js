@@ -18,6 +18,7 @@
 
 import { atr, pivots, simulateTrade, resample, nyClock, referenceLevels, periodBias } from './core.js';
 import { gradeSetups, GRADE_RANK } from './ierules.js';
+import { findMarcoSetups } from './marco.js';
 
 export const DEFAULTS = {
   pivotK: 3,              // swing strength (bars each side)
@@ -298,6 +299,7 @@ function unmirror(s) {
 export function findSetups(candles, params = {}) {
   const p = { ...DEFAULTS, ...params };
   if (candles.length < 50) return [];
+  if (p.model && p.model !== 'davinci') return finish(candles, p, marcoSetups(candles, p));
   const A = atr(candles, 14);
   const bias = p.bias === 'htf' ? htfBias(candles, p.htfFactor) : (p.bias === 'daily' || p.bias === 'weekly') ? periodBias(candles, p.bias) : null;
 
@@ -328,6 +330,24 @@ export function findSetups(candles, params = {}) {
   }
   for (const s of all) s.id = `${s.dir}-${s.lb.t}`;
   all.sort((a, b) => a.lb.i - b.lb.i);
+  return finish(candles, p, all);
+}
+
+/** Marco model setups ('marco' = LB + inducement taken, 'candle4' = 4-candle sniper, 'marco+candle4' = both). */
+function marcoSetups(candles, p) {
+  const session = p.ie && p.kind === 'index' && p.session ? [Math.max(p.session[0], 9.5), p.session[1]] : p.session;
+  const base = { ...p, session, slBufferATR: p.marcoSlBufferATR ?? 0.1, minRiskATR: p.marcoMinRiskATR ?? 0, fixedR: p.marcoFixedR ?? 0 };
+  const out = [];
+  if (p.model === 'marco' || p.model === 'marco+candle4') out.push(...findMarcoSetups(candles, { ...base, mode: 'pivot' }));
+  if (p.model === 'candle4' || p.model === 'marco+candle4') out.push(...findMarcoSetups(candles, { ...base, mode: 'candle4' }));
+  let all = out;
+  const bias = p.bias === 'htf' ? htfBias(candles, p.htfFactor) : (p.bias === 'daily' || p.bias === 'weekly') ? periodBias(candles, p.bias) : null;
+  if (bias) all = all.filter(s => { const b = bias[Math.min(s.armedAt ?? bias.length - 1, bias.length - 1)]; return s.dir === 'short' ? b === -1 : b === 1; });
+  const n = candles.length;
+  return all.sort((a, b) => (a.armedAt ?? n) - (b.armedAt ?? n));
+}
+
+function finish(candles, p, all) {
   if (p.ie) {
     // grade what can still be traded or was traded; expired/invalid setups need no checklist
     gradeSetups(candles, all.filter(s => s.armedAt != null || s.status === 'forming'), { ...p, ...(p.ieParams || {}), sessionStart: p.session ? p.session[0] : 8, sessionEnd: p.session ? p.session[1] : 11 });

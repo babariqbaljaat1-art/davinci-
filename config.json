@@ -44,17 +44,19 @@
     "15m"
   ],
   "params": {
+    "model": "marco",
     "pivotK": 3,
-    "entryMode": "level",
-    "tpMode": "liquidity",
+    "entryK": 2,
+    "insideLB": true,
     "minRR": 3,
-    "slBufferATR": 0.3,
-    "minRiskATR": 0.5,
+    "marcoSlBufferATR": 0.5,
+    "marcoMinRiskATR": 1,
     "costR": 0.02,
     "session": [
       8,
       11
     ],
+    "bias": "daily",
     "ie": true,
     "ieMin": "B",
     "manage": "ie",

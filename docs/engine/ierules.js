@@ -126,8 +126,13 @@ export function gradeSetups(candles, setups, params = {}) {
     checks.push(check('A1', 'pass', s.swept?.kind ? `${s.swept.kind} sweep` : 'swing sweep'));
     checks.push(check('A2', s.disp === false ? 'fail' : 'pass'));
     const hasBuild = !!s.bos && s.buildup.length > 0;
-    checks.push(check('A3', hasBuild ? 'pass' : (s.armedAt == null ? 'wait' : 'fail')));
-    checks.push(check('A4', s.armedAt == null ? 'wait' : 'pass', s.armedAt == null ? '' : 'limit LB par: price buildup le kar aayegi tab fill'));
+    const marco = s.model === 'pivot' || s.model === 'candle4';
+    const who = short ? 'sellers' : 'buyers', hl = short ? 'high' : 'low';
+    checks.push(check('A3', hasBuild ? 'pass' : (s.armedAt == null ? 'wait' : 'fail'),
+      marco ? (hasBuild ? `LB se move ne ${who} induce kiye, inducement ${hl} bana` : `inducement ${hl} ka intezar`) : ''));
+    checks.push(check('A4', s.armedAt == null ? 'wait' : 'pass', s.armedAt == null ? '' : marco
+      ? `jaise hi inducement ${hl} stab ho: entry (${who} trapped), LB ke andar`
+      : 'limit LB par: price buildup le kar aayegi tab fill'));
     checks.push(check('A5', s.respected ? 'pass' : (s.armedAt == null ? 'wait' : 'fail'), s.respected ? '' : 'no engineered liquidity = low probability'));
     checks.push(check('A6', hasBuild ? 'pass' : 'wait'));
     const strong = !!s.swept?.kind || (s.swept?.strength ?? 0) >= p.leftStrength;

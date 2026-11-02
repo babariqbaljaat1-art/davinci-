@@ -1,0 +1,1231 @@
+{
+ "t0": 1667260800,
+ "t1": 1793393700,
+ "split": 1755553830,
+ "rows": [
+  {
+   "tf": "5m",
+   "label": "Marco: LB + liquidity taken (preset)",
+   "all": {
+    "trades": 509,
+    "wins": 103,
+    "losses": 406,
+    "winRate": 0.20235756385068762,
+    "avgWinR": 4.039274978155491,
+    "expectancyR": -0.09532774434964494,
+    "totalR": -48.52182187396927,
+    "profitFactor": 0.89555477085397,
+    "maxDrawdownR": 78.01790612545174,
+    "maxLosingStreak": 21
+   },
+   "is": {
+    "trades": 349,
+    "wins": 68,
+    "losses": 281,
+    "winRate": 0.19484240687679083,
+    "avgWinR": 4.09993211040034,
+    "expectancyR": -0.14401388359497647,
+    "totalR": -50.260845374646784,
+    "profitFactor": 0.8472575779968284,
+    "maxDrawdownR": 72.45068530012989,
+    "maxLosingStreak": 21
+   },
+   "oos": {
+    "trades": 160,
+    "wins": 35,
+    "losses": 125,
+    "winRate": 0.21875,
+    "avgWinR": 3.921426835508349,
+    "expectancyR": 0.010868896879234263,
+    "totalR": 1.7390235006774821,
+    "profitFactor": 1.0128330879557106,
+    "maxDrawdownR": 35.86197879700762,
+    "maxLosingStreak": 12
+   },
+   "per": {
+    "EURUSD": {
+     "trades": 147,
+     "wins": 32,
+     "losses": 115,
+     "winRate": 0.21768707482993196,
+     "avgWinR": 4.27811558017409,
+     "expectancyR": 0.0353290000252157,
+     "totalR": 5.193363003706708,
+     "profitFactor": 1.0394313833237525,
+     "maxDrawdownR": 26.788648972173206,
+     "maxLosingStreak": 21
+    },
+    "GBPUSD": {
+     "trades": 130,
+     "wins": 29,
+     "losses": 101,
+     "winRate": 0.2230769230769231,
+     "avgWinR": 3.6034120945842294,
+     "expectancyR": -0.11408207549074725,
+     "totalR": -14.830669813797144,
+     "profitFactor": 0.8757167772376738,
+     "maxDrawdownR": 29.099619116664925,
+     "maxLosingStreak": 20
+    },
+    "NAS100": {
+     "trades": 48,
+     "wins": 8,
+     "losses": 40,
+     "winRate": 0.16666666666666666,
+     "avgWinR": 5.817265163422702,
+     "expectancyR": 0.040273685806887144,
+     "totalR": 1.933136918730583,
+     "profitFactor": 1.0433390336354977,
+     "maxDrawdownR": 9.73677181599897,
+     "maxLosingStreak": 8
+    },
+    "US30": {
+     "trades": 45,
+     "wins": 5,
+     "losses": 40,
+     "winRate": 0.1111111111111111,
+     "avgWinR": 3.57774387229849,
+     "expectancyR": -0.5885627152501927,
+     "totalR": -26.48532218625867,
+     "profitFactor": 0.4031347773955255,
+     "maxDrawdownR": 31.68097846947343,
+     "maxLosingStreak": 17
+    },
+    "XAUUSD": {
+     "trades": 139,
+     "wins": 29,
+     "losses": 110,
+     "winRate": 0.20863309352517986,
+     "avgWinR": 3.8006838887113035,
+     "expectancyR": -0.10311028630468201,
+     "totalR": -14.3323297963508,
+     "profitFactor": 0.8849290971691208,
+     "maxDrawdownR": 34.87556794953499,
+     "maxLosingStreak": 13
+    }
+   }
+  },
+  {
+   "tf": "5m",
+   "label": "Marco + 4-candle (preset)",
+   "all": {
+    "trades": 1568,
+    "wins": 348,
+    "losses": 1220,
+    "winRate": 0.22193877551020408,
+    "avgWinR": 3.5667001011701274,
+    "expectancyR": -0.09746770291740184,
+    "totalR": -152.8293581744861,
+    "profitFactor": 0.8903695379834216,
+    "maxDrawdownR": 177.22389945804994,
+    "maxLosingStreak": 24
+   },
+   "is": {
+    "trades": 1094,
+    "wins": 234,
+    "losses": 860,
+    "winRate": 0.21389396709323583,
+    "avgWinR": 3.575853171690713,
+    "expectancyR": -0.1407081388271459,
+    "totalR": -153.9347038768976,
+    "profitFactor": 0.8446178094059289,
+    "maxDrawdownR": 173.16865795740677,
+    "maxLosingStreak": 24
+   },
+   "oos": {
+    "trades": 474,
+    "wins": 114,
+    "losses": 360,
+    "winRate": 0.24050632911392406,
+    "avgWinR": 3.5479122195752457,
+    "expectancyR": 0.0023319529586742,
+    "totalR": 1.1053457024115707,
+    "profitFactor": 1.0027403681325966,
+    "maxDrawdownR": 46.46227851065118,
+    "maxLosingStreak": 14
+   },
+   "per": {
+    "EURUSD": {
+     "trades": 354,
+     "wins": 81,
+     "losses": 273,
+     "winRate": 0.2288135593220339,
+     "avgWinR": 3.755684728431968,
+     "expectancyR": -0.039481194447879134,
+     "totalR": -13.976342834549214,
+     "profitFactor": 0.9560750396366675,
+     "maxDrawdownR": 39.67715022482885,
+     "maxLosingStreak": 14
+    },
+    "GBPUSD": {
+     "trades": 354,
+     "wins": 84,
+     "losses": 270,
+     "winRate": 0.23728813559322035,
+     "avgWinR": 3.3324429181660014,
+     "expectancyR": -0.12697015228999362,
+     "totalR": -44.94743391065774,
+     "profitFactor": 0.8616459851960825,
+     "maxDrawdownR": 82.49804119309749,
+     "maxLosingStreak": 24
+    },
+    "NAS100": {
+     "trades": 237,
+     "wins": 49,
+     "losses": 188,
+     "winRate": 0.20675105485232068,
+     "avgWinR": 3.7730292965676124,
+     "expectancyR": -0.08106103978444336,
+     "totalR": -19.211466428913077,
+     "profitFactor": 0.9058676287050684,
+     "maxDrawdownR": 26.73728468570297,
+     "maxLosingStreak": 14
+    },
+    "US30": {
+     "trades": 231,
+     "wins": 42,
+     "losses": 189,
+     "winRate": 0.18181818181818182,
+     "avgWinR": 3.502328974297247,
+     "expectancyR": -0.2612152717176682,
+     "totalR": -60.34072776678134,
+     "profitFactor": 0.709115160551521,
+     "maxDrawdownR": 75.36790483661531,
+     "maxLosingStreak": 16
+    },
+    "XAUUSD": {
+     "trades": 392,
+     "wins": 92,
+     "losses": 300,
+     "winRate": 0.23469387755102042,
+     "avgWinR": 3.533692550282325,
+     "expectancyR": -0.036615783759144045,
+     "totalR": -14.353387233584465,
+     "profitFactor": 0.9577161405951071,
+     "maxDrawdownR": 36.5887996756567,
+     "maxLosingStreak": 11
+    }
+   }
+  },
+  {
+   "tf": "5m",
+   "label": "Marco 4-candle only (preset)",
+   "all": {
+    "trades": 1164,
+    "wins": 268,
+    "losses": 896,
+    "winRate": 0.23024054982817868,
+    "avgWinR": 3.3614302338543824,
+    "expectancyR": -0.10368474062308457,
+    "totalR": -120.68903808527044,
+    "profitFactor": 0.8818572154651527,
+    "maxDrawdownR": 168.00274418831793,
+    "maxLosingStreak": 15
+   },
+   "is": {
+    "trades": 814,
+    "wins": 176,
+    "losses": 638,
+    "winRate": 0.21621621621621623,
+    "avgWinR": 3.3544515453517714,
+    "expectancyR": -0.1729407565072555,
+    "totalR": -140.77377579690597,
+    "profitFactor": 0.8074644322755987,
+    "maxDrawdownR": 168.00274418831793,
+    "maxLosingStreak": 15
+   },
+   "oos": {
+    "trades": 350,
+    "wins": 92,
+    "losses": 258,
+    "winRate": 0.26285714285714284,
+    "avgWinR": 3.3747807683811257,
+    "expectancyR": 0.057384964890386914,
+    "totalR": 20.08473771163542,
+    "profitFactor": 1.0691634886304993,
+    "maxDrawdownR": 31.657897544526946,
+    "maxLosingStreak": 12
+   },
+   "per": {
+    "EURUSD": {
+     "trades": 246,
+     "wins": 60,
+     "losses": 186,
+     "winRate": 0.24390243902439024,
+     "avgWinR": 3.514339295084274,
+     "expectancyR": -0.03590569147738647,
+     "totalR": -8.832800103437071,
+     "profitFactor": 0.9597948329772903,
+     "maxDrawdownR": 31.854535966728836,
+     "maxLosingStreak": 14
+    },
+    "GBPUSD": {
+     "trades": 246,
+     "wins": 61,
+     "losses": 185,
+     "winRate": 0.24796747967479674,
+     "avgWinR": 3.1319769350433924,
+     "expectancyR": -0.1285361736596788,
+     "totalR": -31.61989872028098,
+     "profitFactor": 0.8579969062328383,
+     "maxDrawdownR": 80.51155336252697,
+     "maxLosingStreak": 15
+    },
+    "NAS100": {
+     "trades": 198,
+     "wins": 41,
+     "losses": 157,
+     "winRate": 0.20707070707070707,
+     "avgWinR": 3.3741540054739376,
+     "expectancyR": -0.15880433964400856,
+     "totalR": -31.443259249513694,
+     "profitFactor": 0.8148038788078695,
+     "maxDrawdownR": 41.470846468100476,
+     "maxLosingStreak": 13
+    },
+    "US30": {
+     "trades": 196,
+     "wins": 38,
+     "losses": 158,
+     "winRate": 0.19387755102040816,
+     "avgWinR": 3.462654056125813,
+     "expectancyR": -0.20769356787165674,
+     "totalR": -40.70793930284472,
+     "profitFactor": 0.7637226514209993,
+     "maxDrawdownR": 58.00501801626161,
+     "maxLosingStreak": 15
+    },
+    "XAUUSD": {
+     "trades": 278,
+     "wins": 68,
+     "losses": 210,
+     "winRate": 0.2446043165467626,
+     "avgWinR": 3.3681056407802856,
+     "expectancyR": -0.029083239961129537,
+     "totalR": -8.085140709194011,
+     "profitFactor": 0.9659022181046892,
+     "maxDrawdownR": 25.052317763468025,
+     "maxLosingStreak": 11
+    }
+   }
+  },
+  {
+   "tf": "5m",
+   "label": "Marco, inducement anywhere below the LB",
+   "all": {
+    "trades": 725,
+    "wins": 147,
+    "losses": 578,
+    "winRate": 0.20275862068965517,
+    "avgWinR": 3.760666269648385,
+    "expectancyR": -0.11760747495110971,
+    "totalR": -85.26541933955454,
+    "profitFactor": 0.866372601835465,
+    "maxDrawdownR": 114.10077577961437,
+    "maxLosingStreak": 21
+   },
+   "is": {
+    "trades": 514,
+    "wins": 102,
+    "losses": 412,
+    "winRate": 0.19844357976653695,
+    "avgWinR": 3.7868925235064372,
+    "expectancyR": -0.14674374081507274,
+    "totalR": -75.4262827789474,
+    "profitFactor": 0.8366297865627574,
+    "maxDrawdownR": 95.94331566067417,
+    "maxLosingStreak": 21
+   },
+   "oos": {
+    "trades": 211,
+    "wins": 45,
+    "losses": 166,
+    "winRate": 0.2132701421800948,
+    "avgWinR": 3.701220094236799,
+    "expectancyR": -0.04663097896022331,
+    "totalR": -9.839136560607118,
+    "profitFactor": 0.9442206975025159,
+    "maxDrawdownR": 44.72668060417409,
+    "maxLosingStreak": 14
+   },
+   "per": {
+    "EURUSD": {
+     "trades": 193,
+     "wins": 43,
+     "losses": 150,
+     "winRate": 0.22279792746113988,
+     "avgWinR": 3.903299025692495,
+     "expectancyR": -0.0031794127943429017,
+     "totalR": -0.61362666930818,
+     "profitFactor": 0.9963573363602186,
+     "maxDrawdownR": 32.53276212276169,
+     "maxLosingStreak": 19
+    },
+    "GBPUSD": {
+     "trades": 183,
+     "wins": 45,
+     "losses": 138,
+     "winRate": 0.2459016393442623,
+     "avgWinR": 3.3902408144109297,
+     "expectancyR": -0.008215433536014612,
+     "totalR": -1.503424337090674,
+     "profitFactor": 0.9902415762911344,
+     "maxDrawdownR": 28.04310399635345,
+     "maxLosingStreak": 14
+    },
+    "NAS100": {
+     "trades": 89,
+     "wins": 14,
+     "losses": 75,
+     "winRate": 0.15730337078651685,
+     "avgWinR": 5.109598616988877,
+     "expectancyR": -0.10296525097275118,
+     "totalR": -9.163907336574855,
+     "profitFactor": 0.8864423574948733,
+     "maxDrawdownR": 16.722127267312953,
+     "maxLosingStreak": 16
+    },
+    "US30": {
+     "trades": 82,
+     "wins": 16,
+     "losses": 66,
+     "winRate": 0.1951219512195122,
+     "avgWinR": 4.022917894338329,
+     "expectancyR": -0.09890705192691744,
+     "totalR": -8.11037825800723,
+     "profitFactor": 0.8880973131788097,
+     "maxDrawdownR": 23.175250739657855,
+     "maxLosingStreak": 14
+    },
+    "XAUUSD": {
+     "trades": 178,
+     "wins": 29,
+     "losses": 149,
+     "winRate": 0.16292134831460675,
+     "avgWinR": 3.3280751702684737,
+     "expectancyR": -0.37007911650884034,
+     "totalR": -65.87408273857358,
+     "profitFactor": 0.5943420931236824,
+     "maxDrawdownR": 78.81040001822782,
+     "maxLosingStreak": 14
+    }
+   }
+  },
+  {
+   "tf": "5m",
+   "label": "Marco, no daily bias",
+   "all": {
+    "trades": 677,
+    "wins": 134,
+    "losses": 543,
+    "winRate": 0.19793205317577547,
+    "avgWinR": 4.143034841811489,
+    "expectancyR": -0.10012995776589256,
+    "totalR": -67.78798140750926,
+    "profitFactor": 0.8911831200158301,
+    "maxDrawdownR": 82.720392784362,
+    "maxLosingStreak": 25
+   },
+   "is": {
+    "trades": 457,
+    "wins": 89,
+    "losses": 368,
+    "winRate": 0.19474835886214442,
+    "avgWinR": 4.240484625960728,
+    "expectancyR": -0.11920851143626482,
+    "totalR": -54.47828972637302,
+    "profitFactor": 0.873858223525516,
+    "maxDrawdownR": 79.86562159282639,
+    "maxLosingStreak": 25
+   },
+   "oos": {
+    "trades": 220,
+    "wins": 45,
+    "losses": 175,
+    "winRate": 0.20454545454545456,
+    "avgWinR": 3.950300824271882,
+    "expectancyR": -0.06049859855061928,
+    "totalR": -13.309691681136242,
+    "profitFactor": 0.9303424568340617,
+    "maxDrawdownR": 50.694828083969725,
+    "maxLosingStreak": 13
+   },
+   "per": {
+    "EURUSD": {
+     "trades": 187,
+     "wins": 41,
+     "losses": 146,
+     "winRate": 0.2192513368983957,
+     "avgWinR": 4.283270543726318,
+     "expectancyR": 0.03000208824563871,
+     "totalR": 5.610390501934439,
+     "profitFactor": 1.033001578452902,
+     "maxDrawdownR": 30.119772946881092,
+     "maxLosingStreak": 25
+    },
+    "GBPUSD": {
+     "trades": 169,
+     "wins": 39,
+     "losses": 130,
+     "winRate": 0.23076923076923078,
+     "avgWinR": 3.8445512372181017,
+     "expectancyR": -0.02512320406332996,
+     "totalR": -4.245821486702763,
+     "profitFactor": 0.9724625108999356,
+     "maxDrawdownR": 24.49609237642903,
+     "maxLosingStreak": 17
+    },
+    "NAS100": {
+     "trades": 64,
+     "wins": 10,
+     "losses": 54,
+     "winRate": 0.15625,
+     "avgWinR": 5.9595018726445845,
+     "expectancyR": -0.008120916529413325,
+     "totalR": -0.5197386578824528,
+     "profitFactor": 0.9913542251437594,
+     "maxDrawdownR": 16.400210781092518,
+     "maxLosingStreak": 13
+    },
+    "US30": {
+     "trades": 65,
+     "wins": 6,
+     "losses": 59,
+     "winRate": 0.09230769230769231,
+     "avgWinR": 3.1053183563370244,
+     "expectancyR": -0.7035927006440732,
+     "totalR": -45.73352554186476,
+     "profitFactor": 0.28947073753505714,
+     "maxDrawdownR": 48.8036295924553,
+     "maxLosingStreak": 25
+    },
+    "XAUUSD": {
+     "trades": 192,
+     "wins": 38,
+     "losses": 154,
+     "winRate": 0.19791666666666666,
+     "avgWinR": 3.9838986682628015,
+     "expectancyR": -0.11926711574475919,
+     "totalR": -22.899286222993766,
+     "profitFactor": 0.8686119504717601,
+     "maxDrawdownR": 31.171029094498117,
+     "maxLosingStreak": 14
+    }
+   }
+  },
+  {
+   "tf": "5m",
+   "label": "Marco, no IE grading (simple management)",
+   "all": {
+    "trades": 1051,
+    "wins": 185,
+    "losses": 866,
+    "winRate": 0.17602283539486205,
+    "avgWinR": 4.755696178079698,
+    "expectancyR": -0.13102107427616552,
+    "totalR": -137.70314906424997,
+    "profitFactor": 0.8646661330955009,
+    "maxDrawdownR": 170.53357622922277,
+    "maxLosingStreak": 30
+   },
+   "is": {
+    "trades": 725,
+    "wins": 120,
+    "losses": 605,
+    "winRate": 0.16551724137931034,
+    "avgWinR": 4.754888713056938,
+    "expectancyR": -0.19975381821956031,
+    "totalR": -144.82151820918122,
+    "profitFactor": 0.7975679821085704,
+    "maxDrawdownR": 165.69862301627802,
+    "maxLosingStreak": 30
+   },
+   "oos": {
+    "trades": 326,
+    "wins": 65,
+    "losses": 261,
+    "winRate": 0.19938650306748465,
+    "avgWinR": 4.7571868827371,
+    "expectancyR": 0.02183548817463607,
+    "totalR": 7.118369144931359,
+    "profitFactor": 1.0235630517493903,
+    "maxDrawdownR": 37.71688229411729,
+    "maxLosingStreak": 15
+   },
+   "per": {
+    "EURUSD": {
+     "trades": 216,
+     "wins": 43,
+     "losses": 173,
+     "winRate": 0.19907407407407407,
+     "avgWinR": 4.907856155693184,
+     "expectancyR": 0.017109685014584656,
+     "totalR": 3.695691963150286,
+     "profitFactor": 1.017824125240259,
+     "maxDrawdownR": 38.552029116072326,
+     "maxLosingStreak": 19
+    },
+    "GBPUSD": {
+     "trades": 193,
+     "wins": 38,
+     "losses": 155,
+     "winRate": 0.19689119170984457,
+     "avgWinR": 4.347734591110736,
+     "expectancyR": -0.14358086990273655,
+     "totalR": -27.711107891228153,
+     "profitFactor": 0.8563633293743429,
+     "maxDrawdownR": 51.6898008327085,
+     "maxLosingStreak": 20
+    },
+    "NAS100": {
+     "trades": 220,
+     "wins": 34,
+     "losses": 186,
+     "winRate": 0.15454545454545454,
+     "avgWinR": 5.683827219795375,
+     "expectancyR": -0.07319688009255493,
+     "totalR": -16.103313620362083,
+     "profitFactor": 0.9230807304140941,
+     "maxDrawdownR": 52.19240434908091,
+     "maxLosingStreak": 20
+    },
+    "US30": {
+     "trades": 193,
+     "wins": 26,
+     "losses": 167,
+     "winRate": 0.13471502590673576,
+     "avgWinR": 4.606686756522112,
+     "expectancyR": -0.3806897443531178,
+     "totalR": -73.47312066015174,
+     "profitFactor": 0.6197967903270653,
+     "maxDrawdownR": 81.36648536138757,
+     "maxLosingStreak": 30
+    },
+    "XAUUSD": {
+     "trades": 229,
+     "wins": 44,
+     "losses": 185,
+     "winRate": 0.19213973799126638,
+     "avgWinR": 4.330183696479807,
+     "expectancyR": -0.10528951465352854,
+     "totalR": -24.111298855658035,
+     "profitFactor": 0.887666006643,
+     "maxDrawdownR": 52.47211827049948,
+     "maxLosingStreak": 22
+    }
+   }
+  },
+  {
+   "tf": "15m",
+   "label": "Marco: LB + liquidity taken (preset)",
+   "all": {
+    "trades": 150,
+    "wins": 35,
+    "losses": 115,
+    "winRate": 0.23333333333333334,
+    "avgWinR": 2.6438537041998895,
+    "expectancyR": -0.21928144793133114,
+    "totalR": -32.89221718969967,
+    "profitFactor": 0.7377582833434719,
+    "maxDrawdownR": 36.598269463313464,
+    "maxLosingStreak": 16
+   },
+   "is": {
+    "trades": 96,
+    "wins": 24,
+    "losses": 72,
+    "winRate": 0.25,
+    "avgWinR": 2.8387614862068786,
+    "expectancyR": -0.1162858790980024,
+    "totalR": -11.16344439340823,
+    "profitFactor": 0.8592140161335986,
+    "maxDrawdownR": 22.893727082478744,
+    "maxLosingStreak": 9
+   },
+   "oos": {
+    "trades": 54,
+    "wins": 11,
+    "losses": 43,
+    "winRate": 0.2037037037037037,
+    "avgWinR": 2.218600361639187,
+    "expectancyR": -0.4023846814128045,
+    "totalR": -21.72877279629144,
+    "profitFactor": 0.5290010331872017,
+    "maxDrawdownR": 21.72877279629144,
+    "maxLosingStreak": 16
+   },
+   "per": {
+    "EURUSD": {
+     "trades": 47,
+     "wins": 11,
+     "losses": 36,
+     "winRate": 0.23404255319148937,
+     "avgWinR": 2.245723304728258,
+     "expectancyR": -0.31761642447939775,
+     "totalR": -14.927971950531695,
+     "profitFactor": 0.6233252010507666,
+     "maxDrawdownR": 20.86962784284747,
+     "maxLosingStreak": 10
+    },
+    "GBPUSD": {
+     "trades": 47,
+     "wins": 12,
+     "losses": 35,
+     "winRate": 0.2553191489361702,
+     "avgWinR": 2.5208421717539564,
+     "expectancyR": -0.19918826880178284,
+     "totalR": -9.361848633683794,
+     "profitFactor": 0.7636610284488434,
+     "maxDrawdownR": 12.76295880018599,
+     "maxLosingStreak": 8
+    },
+    "NAS100": {
+     "trades": 9,
+     "wins": 4,
+     "losses": 5,
+     "winRate": 0.4444444444444444,
+     "avgWinR": 2.8299758418464256,
+     "expectancyR": 0.6607800143655908,
+     "totalR": 5.947020129290316,
+     "profitFactor": 2.1068582483096088,
+     "maxDrawdownR": 2.2017400634023536,
+     "maxLosingStreak": 2
+    },
+    "US30": {
+     "trades": 14,
+     "wins": 2,
+     "losses": 12,
+     "winRate": 0.14285714285714285,
+     "avgWinR": 2.701869350571196,
+     "expectancyR": -0.47541737542852897,
+     "totalR": -6.655843255999406,
+     "profitFactor": 0.4480867347099247,
+     "maxDrawdownR": 8.807217591767342,
+     "maxLosingStreak": 9
+    },
+    "XAUUSD": {
+     "trades": 33,
+     "wins": 6,
+     "losses": 27,
+     "winRate": 0.18181818181818182,
+     "avgWinR": 3.4763625275682895,
+     "expectancyR": -0.23919919632651795,
+     "totalR": -7.893573478775092,
+     "profitFactor": 0.7254576208055576,
+     "maxDrawdownR": 16.256688989128797,
+     "maxLosingStreak": 11
+    }
+   }
+  },
+  {
+   "tf": "15m",
+   "label": "Marco + 4-candle (preset)",
+   "all": {
+    "trades": 605,
+    "wins": 140,
+    "losses": 465,
+    "winRate": 0.23140495867768596,
+    "avgWinR": 2.5544702402557258,
+    "expectancyR": -0.24348058321709407,
+    "totalR": -147.3057528463419,
+    "profitFactor": 0.7082659180174873,
+    "maxDrawdownR": 152.62729485403264,
+    "maxLosingStreak": 22
+   },
+   "is": {
+    "trades": 427,
+    "wins": 108,
+    "losses": 319,
+    "winRate": 0.2529274004683841,
+    "avgWinR": 2.51435985325044,
+    "expectancyR": -0.1799296630172185,
+    "totalR": -76.8299661083523,
+    "profitFactor": 0.7794655749251598,
+    "maxDrawdownR": 93.56344733717714,
+    "maxLosingStreak": 15
+   },
+   "oos": {
+    "trades": 178,
+    "wins": 32,
+    "losses": 146,
+    "winRate": 0.1797752808988764,
+    "avgWinR": 2.689842796398564,
+    "expectancyR": -0.39593138616848134,
+    "totalR": -70.47578673798968,
+    "profitFactor": 0.5498214864084385,
+    "maxDrawdownR": 70.47578673798968,
+    "maxLosingStreak": 22
+   },
+   "per": {
+    "EURUSD": {
+     "trades": 153,
+     "wins": 38,
+     "losses": 115,
+     "winRate": 0.24836601307189543,
+     "avgWinR": 2.1852535942342706,
+     "expectancyR": -0.2657122822207653,
+     "totalR": -40.653979179777096,
+     "profitFactor": 0.6713332460227066,
+     "maxDrawdownR": 48.442684553211535,
+     "maxLosingStreak": 24
+    },
+    "GBPUSD": {
+     "trades": 159,
+     "wins": 41,
+     "losses": 118,
+     "winRate": 0.2578616352201258,
+     "avgWinR": 2.315288435440066,
+     "expectancyR": -0.24378767098218346,
+     "totalR": -38.76223968616717,
+     "profitFactor": 0.7100567684438,
+     "maxDrawdownR": 38.859625938555716,
+     "maxLosingStreak": 12
+    },
+    "NAS100": {
+     "trades": 73,
+     "wins": 17,
+     "losses": 56,
+     "winRate": 0.2328767123287671,
+     "avgWinR": 2.766217007083657,
+     "expectancyR": -0.1640708579504906,
+     "totalR": -11.977172630385812,
+     "profitFactor": 0.7970069200885533,
+     "maxDrawdownR": 18.884976703332093,
+     "maxLosingStreak": 8
+    },
+    "US30": {
+     "trades": 86,
+     "wins": 17,
+     "losses": 69,
+     "winRate": 0.19767441860465115,
+     "avgWinR": 2.998432250603961,
+     "expectancyR": -0.24884681412420093,
+     "totalR": -21.40082601468128,
+     "profitFactor": 0.7043030027067417,
+     "maxDrawdownR": 25.650878697867427,
+     "maxLosingStreak": 19
+    },
+    "XAUUSD": {
+     "trades": 134,
+     "wins": 27,
+     "losses": 107,
+     "winRate": 0.20149253731343283,
+     "avgWinR": 3.0244568081913736,
+     "expectancyR": -0.2575487711591839,
+     "totalR": -34.51153533533064,
+     "profitFactor": 0.7029269169385627,
+     "maxDrawdownR": 34.51153533533064,
+     "maxLosingStreak": 17
+    }
+   }
+  },
+  {
+   "tf": "15m",
+   "label": "Marco 4-candle only (preset)",
+   "all": {
+    "trades": 487,
+    "wins": 114,
+    "losses": 373,
+    "winRate": 0.23408624229979466,
+    "avgWinR": 2.5134980308666397,
+    "expectancyR": -0.24416976841266058,
+    "totalR": -118.91067721696571,
+    "profitFactor": 0.7067188612177968,
+    "maxDrawdownR": 127.13778892039818,
+    "maxLosingStreak": 17
+   },
+   "is": {
+    "trades": 351,
+    "wins": 88,
+    "losses": 263,
+    "winRate": 0.25071225071225073,
+    "avgWinR": 2.477564413916009,
+    "expectancyR": -0.19727526093832096,
+    "totalR": -69.24361658935065,
+    "profitFactor": 0.7589592058685084,
+    "maxDrawdownR": 86.3309913673888,
+    "maxLosingStreak": 16
+   },
+   "oos": {
+    "trades": 136,
+    "wins": 26,
+    "losses": 110,
+    "winRate": 0.19117647058823528,
+    "avgWinR": 2.6351195036226205,
+    "expectancyR": -0.3651989752030516,
+    "totalR": -49.66706062761502,
+    "profitFactor": 0.5797343870374968,
+    "maxDrawdownR": 50.1134359656469,
+    "maxLosingStreak": 17
+   },
+   "per": {
+    "EURUSD": {
+     "trades": 121,
+     "wins": 32,
+     "losses": 89,
+     "winRate": 0.2644628099173554,
+     "avgWinR": 2.249309931329831,
+     "expectancyR": -0.19398219079728135,
+     "totalR": -23.471845086471042,
+     "profitFactor": 0.7540921593093898,
+     "maxDrawdownR": 31.52597266235749,
+     "maxLosingStreak": 11
+    },
+    "GBPUSD": {
+     "trades": 118,
+     "wins": 31,
+     "losses": 87,
+     "winRate": 0.2627118644067797,
+     "avgWinR": 2.227767631064524,
+     "expectancyR": -0.2509069353706238,
+     "totalR": -29.60701837373361,
+     "profitFactor": 0.6999323599826576,
+     "maxDrawdownR": 29.738991657078337,
+     "maxLosingStreak": 16
+    },
+    "NAS100": {
+     "trades": 68,
+     "wins": 15,
+     "losses": 53,
+     "winRate": 0.22058823529411764,
+     "avgWinR": 2.6085528625573198,
+     "expectancyR": -0.24486876503029034,
+     "totalR": -16.651076022059744,
+     "profitFactor": 0.7014832485129912,
+     "maxDrawdownR": 20.500783817205654,
+     "maxLosingStreak": 10
+    },
+    "US30": {
+     "trades": 73,
+     "wins": 15,
+     "losses": 58,
+     "winRate": 0.2054794520547945,
+     "avgWinR": 3.0379739706083293,
+     "expectancyR": -0.216738857874425,
+     "totalR": -15.821936624833025,
+     "profitFactor": 0.7422782515132775,
+     "maxDrawdownR": 24.645284636438817,
+     "maxLosingStreak": 16
+    },
+    "XAUUSD": {
+     "trades": 107,
+     "wins": 21,
+     "losses": 86,
+     "winRate": 0.19626168224299065,
+     "avgWinR": 2.8953408883693985,
+     "expectancyR": -0.311764496353909,
+     "totalR": -33.35880110986827,
+     "profitFactor": 0.645725774324082,
+     "maxDrawdownR": 37.245651373938564,
+     "maxLosingStreak": 16
+    }
+   }
+  },
+  {
+   "tf": "15m",
+   "label": "Marco, inducement anywhere below the LB",
+   "all": {
+    "trades": 198,
+    "wins": 50,
+    "losses": 148,
+    "winRate": 0.25252525252525254,
+    "avgWinR": 2.547157515166113,
+    "expectancyR": -0.16263659369882275,
+    "totalR": -32.202045552366904,
+    "profitFactor": 0.7981821168633717,
+    "maxDrawdownR": 37.73561815427749,
+    "maxLosingStreak": 13
+   },
+   "is": {
+    "trades": 138,
+    "wins": 36,
+    "losses": 102,
+    "winRate": 0.2608695652173913,
+    "avgWinR": 2.5581067098922827,
+    "expectancyR": -0.1308852983573015,
+    "totalR": -18.062171173307608,
+    "profitFactor": 0.8360280236211313,
+    "maxDrawdownR": 27.19032983769642,
+    "maxLosingStreak": 13
+   },
+   "oos": {
+    "trades": 60,
+    "wins": 14,
+    "losses": 46,
+    "winRate": 0.23333333333333334,
+    "avgWinR": 2.5190024430131066,
+    "expectancyR": -0.2356645729843216,
+    "totalR": -14.139874379059297,
+    "profitFactor": 0.7138019563832578,
+    "maxDrawdownR": 16.053028750981756,
+    "maxLosingStreak": 12
+   },
+   "per": {
+    "EURUSD": {
+     "trades": 64,
+     "wins": 15,
+     "losses": 49,
+     "winRate": 0.234375,
+     "avgWinR": 2.188023949435787,
+     "expectancyR": -0.3305768426794056,
+     "totalR": -21.15691793148196,
+     "profitFactor": 0.6080402895524804,
+     "maxDrawdownR": 27.2099104513531,
+     "maxLosingStreak": 11
+    },
+    "GBPUSD": {
+     "trades": 60,
+     "wins": 19,
+     "losses": 41,
+     "winRate": 0.31666666666666665,
+     "avgWinR": 2.554937042220336,
+     "expectancyR": 0.05586080475095309,
+     "totalR": 3.3516482850571854,
+     "profitFactor": 1.0741643819973759,
+     "maxDrawdownR": 12.780324536151934,
+     "maxLosingStreak": 9
+    },
+    "NAS100": {
+     "trades": 10,
+     "wins": 4,
+     "losses": 6,
+     "winRate": 0.4,
+     "avgWinR": 2.8299758418464256,
+     "expectancyR": 0.49086429682697624,
+     "totalR": 4.9086429682697625,
+     "profitFactor": 1.7656283885999424,
+     "maxDrawdownR": 2.2017400634023536,
+     "maxLosingStreak": 2
+    },
+    "US30": {
+     "trades": 20,
+     "wins": 3,
+     "losses": 17,
+     "winRate": 0.15,
+     "avgWinR": 4.06072938802278,
+     "expectancyR": -0.21211036190646387,
+     "totalR": -4.242207238129278,
+     "profitFactor": 0.741713035137862,
+     "maxDrawdownR": 12.087001565184254,
+     "maxLosingStreak": 13
+    },
+    "XAUUSD": {
+     "trades": 44,
+     "wins": 9,
+     "losses": 35,
+     "winRate": 0.20454545454545456,
+     "avgWinR": 2.499069020347608,
+     "expectancyR": -0.34234571900187766,
+     "totalR": -15.063211636082617,
+     "profitFactor": 0.5989008469669698,
+     "maxDrawdownR": 20.04197438031043,
+     "maxLosingStreak": 11
+    }
+   }
+  },
+  {
+   "tf": "15m",
+   "label": "Marco, no daily bias",
+   "all": {
+    "trades": 181,
+    "wins": 43,
+    "losses": 138,
+    "winRate": 0.23756906077348067,
+    "avgWinR": 2.7214417623282627,
+    "expectancyR": -0.18366679756203783,
+    "totalR": -33.24369035872885,
+    "profitFactor": 0.7787672541020978,
+    "maxDrawdownR": 36.94974263234264,
+    "maxLosingStreak": 15
+   },
+   "is": {
+    "trades": 117,
+    "wins": 29,
+    "losses": 88,
+    "winRate": 0.24786324786324787,
+    "avgWinR": 2.863519567240529,
+    "expectancyR": -0.11858839211494247,
+    "totalR": -13.874841877448269,
+    "profitFactor": 0.8568377595433463,
+    "maxDrawdownR": 25.14062833493717,
+    "maxLosingStreak": 10
+   },
+   "oos": {
+    "trades": 64,
+    "wins": 14,
+    "losses": 50,
+    "winRate": 0.21875,
+    "avgWinR": 2.427137737867141,
+    "expectancyR": -0.302638257520009,
+    "totalR": -19.368848481280576,
+    "profitFactor": 0.6369392207482775,
+    "maxDrawdownR": 21.51286439019519,
+    "maxLosingStreak": 15
+   },
+   "per": {
+    "EURUSD": {
+     "trades": 57,
+     "wins": 16,
+     "losses": 41,
+     "winRate": 0.2807017543859649,
+     "avgWinR": 2.4384290303453335,
+     "expectancyR": -0.11264166244720786,
+     "totalR": -6.420574759490848,
+     "profitFactor": 0.8586879566660045,
+     "maxDrawdownR": 11.213398338749755,
+     "maxLosingStreak": 6
+    },
+    "GBPUSD": {
+     "trades": 55,
+     "wins": 13,
+     "losses": 42,
+     "winRate": 0.23636363636363636,
+     "avgWinR": 2.664040925448298,
+     "expectancyR": -0.22682529066247098,
+     "totalR": -12.475390986435904,
+     "profitFactor": 0.7351742512217316,
+     "maxDrawdownR": 15.046393854524855,
+     "maxLosingStreak": 10
+    },
+    "NAS100": {
+     "trades": 13,
+     "wins": 4,
+     "losses": 9,
+     "winRate": 0.3076923076923077,
+     "avgWinR": 2.8299758418464256,
+     "expectancyR": 0.12118919564827414,
+     "totalR": 1.5754595434275638,
+     "profitFactor": 1.1616777285486592,
+     "maxDrawdownR": 3.306919147723045,
+     "maxLosingStreak": 3
+    },
+    "US30": {
+     "trades": 16,
+     "wins": 2,
+     "losses": 14,
+     "winRate": 0.125,
+     "avgWinR": 2.701869350571196,
+     "expectancyR": -0.5176528586136008,
+     "totalR": -8.282445737817612,
+     "profitFactor": 0.39483164392843856,
+     "maxDrawdownR": 9.928124016764558,
+     "maxLosingStreak": 10
+    },
+    "XAUUSD": {
+     "trades": 40,
+     "wins": 8,
+     "losses": 32,
+     "winRate": 0.2,
+     "avgWinR": 3.3313696494042526,
+     "expectancyR": -0.19101846046030105,
+     "totalR": -7.640738418412042,
+     "profitFactor": 0.7771840009167854,
+     "maxDrawdownR": 14.837134496999745,
+     "maxLosingStreak": 8
+    }
+   }
+  },
+  {
+   "tf": "15m",
+   "label": "Marco, no IE grading (simple management)",
+   "all": {
+    "trades": 349,
+    "wins": 61,
+    "losses": 288,
+    "winRate": 0.17478510028653296,
+    "avgWinR": 4.9365078193564305,
+    "expectancyR": -0.05353822325641544,
+    "totalR": -18.68483991648899,
+    "profitFactor": 0.9415755174472069,
+    "maxDrawdownR": 54.86791569710045,
+    "maxLosingStreak": 24
+   },
+   "is": {
+    "trades": 240,
+    "wins": 40,
+    "losses": 200,
+    "winRate": 0.16666666666666666,
+    "avgWinR": 4.9529213409141075,
+    "expectancyR": -0.10258812435238336,
+    "totalR": -24.621149844572006,
+    "profitFactor": 0.8894613875505205,
+    "maxDrawdownR": 54.86791569710045,
+    "maxLosingStreak": 24
+   },
+   "oos": {
+    "trades": 109,
+    "wins": 21,
+    "losses": 88,
+    "winRate": 0.1926605504587156,
+    "avgWinR": 4.905243968770378,
+    "expectancyR": 0.05446155897323842,
+    "totalR": 5.936309928082988,
+    "profitFactor": 1.0611525366026133,
+    "maxDrawdownR": 18.809588836954664,
+    "maxLosingStreak": 16
+   },
+   "per": {
+    "EURUSD": {
+     "trades": 78,
+     "wins": 12,
+     "losses": 66,
+     "winRate": 0.15384615384615385,
+     "avgWinR": 5.354178274680692,
+     "expectancyR": -0.13146464640174224,
+     "totalR": -10.254242419335895,
+     "profitFactor": 0.8623672570226562,
+     "maxDrawdownR": 26.141608355019102,
+     "maxLosingStreak": 12
+    },
+    "GBPUSD": {
+     "trades": 67,
+     "wins": 9,
+     "losses": 58,
+     "winRate": 0.13432835820895522,
+     "avgWinR": 3.9162114738392813,
+     "expectancyR": -0.47242577218417964,
+     "totalR": -31.652526736340036,
+     "profitFactor": 0.5268569570927562,
+     "maxDrawdownR": 45.71844954225547,
+     "maxLosingStreak": 18
+    },
+    "NAS100": {
+     "trades": 69,
+     "wins": 19,
+     "losses": 50,
+     "winRate": 0.2753623188405797,
+     "avgWinR": 5.522457180857008,
+     "expectancyR": 0.7464698831765616,
+     "totalR": 51.50642193918275,
+     "profitFactor": 1.9641738472107064,
+     "maxDrawdownR": 8.627969114823122,
+     "maxLosingStreak": 8
+    },
+    "US30": {
+     "trades": 80,
+     "wins": 13,
+     "losses": 67,
+     "winRate": 0.1625,
+     "avgWinR": 4.509588723973006,
+     "expectancyR": -0.18015708703209404,
+     "totalR": -14.412566962567524,
+     "profitFactor": 0.8026681890586377,
+     "maxDrawdownR": 29.09431138267736,
+     "maxLosingStreak": 23
+    },
+    "XAUUSD": {
+     "trades": 55,
+     "wins": 8,
+     "losses": 47,
+     "winRate": 0.14545454545454545,
+     "avgWinR": 4.759949321511023,
+     "expectancyR": -0.2522168315896055,
+     "totalR": -13.871925737428304,
+     "profitFactor": 0.7329832571831928,
+     "maxDrawdownR": 29.402728091842008,
+     "maxLosingStreak": 15
+    }
+   }
+  }
+ ]
+}
