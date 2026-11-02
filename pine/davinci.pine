@@ -1,45 +1,66 @@
 // This Pine Script® code is subject to the terms of the Mozilla Public License 2.0
-// Da Vinci Setup — mechanical version of the Inter Equity "Da Vinci" model.
-// Same rules as the Da Vinci Scanner app (docs/engine/davinci.js).
+// Inter Equity: Marco's entry model, the way he marks it, plus the Da Vinci model.
+// Same rules as the Da Vinci Scanner app (docs/engine/marco.js, docs/engine/davinci.js).
 //
-// Bearish (bullish is the mirror):
-//  1. Liquidity Block: a swing high runs an intact older swing high, then displacement
-//     (close below the previous candle's low, or a bearish FVG).
-//  2. Buildup below the LB: price breaks the low before the sweep (BOS), then prints a lower high.
-//  3. Engineered lows: a later low respects (does not break) the post-LB low.
-//  4. Entry: sell limit inside the LB, stop above the LB, target the lows / fixed R.
+// MARCO MODEL (default; the entry he takes most in the case studies, webinars and on YouTube):
+//   "I will always enter as soon as the liquidity is taken."  Bearish (bullish is the mirror):
+//  1. Liquidity from the left: a swing high that is still intact gets run by a new high.
+//     "A liquidity block is a high that has swept a previous high." + displacement away from it.
+//  2. The sell-off away from the LB = BOS for retail: SELLERS INDUCED.
+//  3. Price pulls back INSIDE the LB and prints a lower high (the early sellers' stops = $$$ above it).
+//  4. "As soon as this high is stabbed, you are pressing sell": sell at that high (sellers trapped),
+//     stop above the LB, target the low the sell-off left (sell-side liquidity), at least 1:3.
+// 4-CANDLE MODEL ("The ONLY Entry Model You Need"): candle 2 spikes candle 1's high and closes back
+//   below (LB with a big wick), candle 3 leaves a lower high, candle 4 takes candle 3's high ->
+//   sell at candle 3 high, stop above candle 2, target the intact liquidity low on the left.
+//   If candle 4 only respects candle 3's high there is no trade.
+// DA VINCI: LB -> BOS + lower high -> engineered low -> sell limit back at the swept level.
 //
-// Inter Equity rulebook (compiled from all 155 course videos, see the app): every armed setup gets a
-// grade. A = all rules met (full risk), B = core rules met with warnings (half risk), X = a hard rule
-// broken (bank holiday, FOMC day / before NFP, big move yesterday, HTF against, stop too big) -> not shown.
-// Indices only arm after the 9:30 New York stock open. Max 2 trades / 2 losses per day.
+// Marco's marks: rays only on highs/lows that a later high/low respected ("$$$" = resting liquidity,
+// the ray ends where it is taken), PDH/PDL + Asia + London highs/lows, the blue LB box dragged right,
+// "sellers induced" / "buyers induced", "$$$" above the inducement high, "trapped" at the entry.
+//
+// Inter Equity rulebook grade on every entry (compiled from all 155 course videos): A = full risk,
+// B = half risk, X = a hard rule broken (bank holiday, FOMC day / before NFP, big move yesterday,
+// HTF against, stop too big) -> not shown. Indices only after the 9:30 New York open. Max 2 trades /
+// 2 losses per day.
 //
 // Educational tool, not financial advice. Check the on-chart stats table before trusting any alert.
 
 //@version=5
-indicator("Da Vinci Setup (Inter Equity rules)", shorttitle="Da Vinci", overlay=true, max_boxes_count=300, max_lines_count=400, max_labels_count=400, max_bars_back=500)
+indicator("Inter Equity Marco model + Da Vinci", shorttitle="IE Marco", overlay=true, max_boxes_count=300, max_lines_count=500, max_labels_count=500, max_bars_back=500)
 
 // ---------- inputs ----------
-grpR = "Rules"
+grpM = "Model"
+model      = input.string("Marco: LB + liquidity taken", "Entry model", options=["Marco: LB + liquidity taken", "Marco: 4-candle sniper", "Marco: both", "Da Vinci: back to the swept level"], group=grpM, tooltip="Marco: entry the moment the inducement high/low inside the LB is stabbed. 4-candle: candle 4 takes candle 3's high/low. Da Vinci: limit back at the swept level after a buildup.")
+entryK     = input.int(2, "Inducement high/low strength (bars each side)", minval=2, maxval=5, group=grpM)
+insideLB   = input.bool(true, "Inducement must be inside the LB (trapped inside it)", group=grpM)
+maxTries   = input.int(3, "Entries per LB while it holds", minval=1, maxval=5, group=grpM)
+wickFrac   = input.float(0.4, "4-candle: candle 2 wick at least (share of its range)", minval=0, maxval=1, step=0.05, group=grpM)
+c4Window   = input.int(3, "4-candle: candle 4 within (bars)", minval=1, maxval=10, group=grpM)
+grpR = "Liquidity block"
 k          = input.int(3, "Swing strength (bars each side)", minval=2, maxval=10, group=grpR)
 lookback   = input.int(150, "Sweep lookback (bars)", minval=20, maxval=450, group=grpR)
 needDisp   = input.bool(true, "Require displacement after the LB", group=grpR)
-minBuild   = input.int(1, "Minimum buildup swings", minval=1, maxval=5, group=grpR)
-needResp   = input.bool(true, "Require engineered (respected) low/high", group=grpR)
 maxWait    = input.int(200, "Cancel if no entry within (bars)", minval=20, maxval=450, group=grpR)
 grpT = "Trade"
-entryMode  = input.string("Swept level", "Entry", options=["Swept level", "50% of LB", "LB candle body"], group=grpT)
-slBufAtr   = input.float(0.3, "Stop buffer beyond LB (ATR)", minval=0, step=0.05, group=grpT)
-minRiskAtr = input.float(0.5, "Minimum stop distance (ATR)", minval=0, step=0.1, group=grpT)
-tpMode     = input.string("Opposing liquidity", "Target", options=["Opposing liquidity", "Fixed R"], group=grpT)
-fixedR     = input.float(3.0, "Fixed R target", minval=1, step=0.5, group=grpT)
+slBufAtr   = input.float(0.5, "Stop buffer beyond LB (ATR)", minval=0, step=0.05, group=grpT)
+minRiskAtr = input.float(1.0, "Minimum stop distance (ATR)", minval=0, step=0.1, group=grpT)
 minRR      = input.float(3.0, "Minimum RR", minval=1, step=0.5, group=grpT)
 maxRR      = input.float(20.0, "Maximum RR", minval=2, step=1, group=grpT)
 costR      = input.float(0.05, "Cost per trade (R) for stats", minval=0, step=0.01, group=grpT)
-grpS = "Session filter (New York time)"
-useSess    = input.bool(true, "Only arm setups inside the session", group=grpS)
+grpD = "Da Vinci model only"
+minBuild   = input.int(1, "Minimum buildup swings", minval=1, maxval=5, group=grpD)
+needResp   = input.bool(true, "Require engineered (respected) low/high", group=grpD)
+entryMode  = input.string("Swept level", "Entry", options=["Swept level", "50% of LB", "LB candle body"], group=grpD)
+dvSlBuf    = input.float(0.3, "Stop buffer beyond LB (ATR)", minval=0, step=0.05, group=grpD)
+dvMinRisk  = input.float(0.5, "Minimum stop distance (ATR)", minval=0, step=0.1, group=grpD)
+tpMode     = input.string("Opposing liquidity", "Target", options=["Opposing liquidity", "Fixed R"], group=grpD)
+fixedR     = input.float(3.0, "Fixed R target", minval=1, step=0.5, group=grpD)
+grpS = "Session and bias (New York time)"
+useSess    = input.bool(true, "Only trade inside the session (unfilled orders cancelled after it)", group=grpS)
 sess       = input.session("0800-1100", "Session, New York time (8-11 = NY morning)", group=grpS)
-useBias    = input.bool(false, "Hard daily bias: buys only after the previous day low is taken (IE grading already warns)", group=grpS)
+useBias    = input.bool(true, "Daily bias, who is induced: sells only after the previous day high was taken last, buys after the low", group=grpS)
 grpI = "Inter Equity rules"
 useIE      = input.bool(true, "Grade setups with the Inter Equity rulebook (A / B / X)", group=grpI)
 ieMin      = input.string("B", "Show and alert from grade", options=["A", "B", "X"], group=grpI)
@@ -47,12 +68,20 @@ instr      = input.string("Auto", "Instrument", options=["Auto", "FX / Gold", "I
 bigMoveX   = input.float(2.0, "Skip the day after a move this many times the average range", minval=1.2, step=0.1, group=grpI)
 maxDay     = input.int(2, "Max trades per day", minval=1, maxval=10, group=grpI)
 maxLoss    = input.int(2, "Stop for the day after this many losses", minval=1, maxval=10, group=grpI)
-grpV = "Display"
-showForming = input.bool(true, "Show forming setups (LB only)", group=grpV)
+grpV = "Marks"
+showLiq     = input.bool(true, "Liquidity rays ($$$ on highs/lows a later high/low respected)", group=grpV)
+liqTol      = input.float(0.3, "Respected = later high/low within (ATR)", minval=0.05, step=0.05, group=grpV)
+showSessLiq = input.bool(true, "Today's liquidity: PDH/PDL, Asia and London highs/lows", group=grpV)
+showForming = input.bool(true, "Show liquidity blocks still waiting for an entry", group=grpV)
 showStats   = input.bool(true, "Show stats table", group=grpV)
 colLB   = input.color(color.new(#5b8cff, 80), "Liquidity block", group=grpV)
+colLiq  = input.color(#e0a526, "Liquidity ($$$)", group=grpV)
 colRisk = input.color(color.new(#ef5350, 80), "Stop zone", group=grpV)
 colRew  = input.color(color.new(#26a69a, 80), "Target zone", group=grpV)
+
+useDV = model == "Da Vinci: back to the swept level"
+usePivotM = model == "Marco: LB + liquidity taken" or model == "Marco: both"
+useC4 = model == "Marco: 4-candle sniper" or model == "Marco: both"
 
 atr = ta.atr(14)
 inSess = not useSess or not na(time(timeframe.period, sess, "America/New_York"))
@@ -66,6 +95,7 @@ var int dBias = 0
 var ranges = array.new_float()
 var int dayTrades = 0
 var int dayLosses = 0
+var int dayStartBar = na
 if ta.change(time("D")) != 0
     if not na(dayH)
         array.push(ranges, dayH - dayL)
@@ -77,6 +107,7 @@ if ta.change(time("D")) != 0
     dayL := low
     dayTrades := 0
     dayLosses := 0
+    dayStartBar := bar_index
 else
     dayH := na(dayH) ? high : math.max(dayH, high)
     dayL := na(dayL) ? low : math.min(dayL, low)
@@ -176,6 +207,8 @@ var float aftLonH = na
 var float aftLonL = na
 var float asiaAvg = na
 var float lonAvg = na
+var int asiaStartBar = na
+var int lonStartBar = na
 if ta.change(time("D")) != 0
     if not na(asiaH)
         asiaAvg := na(asiaAvg) ? asiaH - asiaL : asiaAvg * 0.9 + (asiaH - asiaL) * 0.1
@@ -190,12 +223,16 @@ if ta.change(time("D")) != 0
     aftLonH := na
     aftLonL := na
 if nyH >= 19
+    if na(asiaH)
+        asiaStartBar := bar_index
     asiaH := na(asiaH) ? high : math.max(asiaH, high)
     asiaL := na(asiaL) ? low : math.min(asiaL, low)
 else if nyH < 17
     aftAsiaH := na(aftAsiaH) ? high : math.max(aftAsiaH, high)
     aftAsiaL := na(aftAsiaL) ? low : math.min(aftAsiaL, low)
     if nyH >= 2 and nyH < 5
+        if na(lonH)
+            lonStartBar := bar_index
         lonH := na(lonH) ? high : math.max(lonH, high)
         lonL := na(lonL) ? low : math.min(lonL, low)
     else if nyH >= 5
@@ -301,6 +338,9 @@ f_isPivotLow(int kk) =>
 
 newPH = bar_index >= 2 * k and f_isPivotHigh(k)
 newPL = bar_index >= 2 * k and f_isPivotLow(k)
+// inducement highs/lows (smaller swings) for the Marco model
+newIH = bar_index >= 2 * entryK and f_isPivotHigh(entryK)
+newIL = bar_index >= 2 * entryK and f_isPivotLow(entryK)
 
 // Pivot storage per direction, in "transformed" prices: for shorts t = price, for longs t = -price.
 // "highs" of the long side are the swing lows (negated) and vice versa, so one routine serves both.
@@ -325,47 +365,55 @@ f_h(int dir, int n) => dir == 1 ? high[n] : -low[n]
 f_l(int dir, int n) => dir == 1 ? low[n] : -high[n]
 f_o(int dir, int n) => dir == 1 ? open[n] : -open[n]
 f_c(int dir, int n) => dir == 1 ? close[n] : -close[n]
+f_real(int dir, float t) => dir == 1 ? t : -t
 
 // ---------- setup objects ----------
 type Setup
-    int   dir          // 1 = short, -1 = long
-    int   lbBar
-    float top          // transformed LB extreme
-    float entry
-    float sl
-    float lp           // BOS reference (transformed low)
-    int   bosBar
-    float ext          // transformed extreme low since the LB
-    int   extBar
-    int   build
-    bool  resp
-    int   state        // 0 forming, 1 armed, 2 open, 3 done
-    float tp
-    float rr
-    int   fillBar
-    box   lbBox
-    box   riskBox
-    box   rewBox
-    label tag
-    int   lstr         // how many bars to the left the swept high was the highest (liquidity from the left)
+    int    dir          // 1 = short, -1 = long
+    int    model        // 0 Da Vinci, 1 Marco (LB + liquidity taken), 2 Marco 4-candle
+    int    lbBar
+    float  top          // transformed LB extreme
+    float  lbBot        // transformed bottom of the LB zone
+    float  lvl          // the swept high/low (liquidity from the left)
+    int    lvlBar
+    float  a            // ATR at the LB
+    float  entry
+    float  sl
+    float  lp           // Da Vinci: BOS reference (transformed low)
+    int    bosBar
+    float  ext          // transformed extreme low since the LB
+    int    extBar
+    int    build = 0
+    bool   resp = false
+    int    state = 0    // 0 waiting, 1 armed, 2 open, 3 loss, 4 win
+    float  tp
+    float  rr
+    int    fillBar
+    int    armBar
+    int    expBar
+    int    born
+    int    tries = 0
+    int    lstr = 0     // how many bars to the left the swept high was the highest (liquidity from the left)
+    string grade = ""
+    box    lbBox
+    box    riskBox
+    box    rewBox
+    label  tag
+    label  ihLbl
+    label  indLbl
+    line   swLine
 
 var setups = array.new<Setup>()
 var int wins = 0
 var int losses = 0
 var float sumR = 0.0
 
-f_real(int dir, float t) => dir == 1 ? t : -t
-
-// create a setup when a new swing high (transformed) is confirmed
-f_tryCreate(int dir, array<int> hiIdx, array<float> hiPx, array<int> loIdx, array<float> loPx) =>
-    int i = bar_index - k
-    float h1 = f_h(dir, k)
-    float a = atr[k]
-    // step 1a: which intact older swing high did it run?
+// the intact older swing high (transformed) that the high at bar i (price h1) ran, if any
+f_sweptHigh(int dir, array<int> hiIdx, array<float> hiPx, int i, float h1) =>
     float h0 = na
     int h0i = na
     int n = array.size(hiIdx)
-    if n > 0 and a > 0
+    if n > 0
         for q = n - 1 to 0
             int hi = array.get(hiIdx, q)
             float hp = array.get(hiPx, q)
@@ -384,6 +432,7 @@ f_tryCreate(int dir, array<int> hiIdx, array<float> hiPx, array<int> loIdx, arra
                     if na(lowV) or f_l(dir, ago) < lowV
                         lowV := f_l(dir, ago)
                         lowAgo := ago
+                // it must have been intact until the leg into the sweep
                 if ok and lowAgo >= 0
                     for x = hi + 1 to bar_index - lowAgo
                         if f_h(dir, bar_index - x) > hp
@@ -392,68 +441,192 @@ f_tryCreate(int dir, array<int> hiIdx, array<float> hiPx, array<int> loIdx, arra
                 if ok and (na(h0) or hp > h0)
                     h0 := hp
                     h0i := hi
-    Setup s = na
+    [h0, h0i]
+
+// bars to the left of the swept high that stayed below it
+f_strength(int dir, float h0, int h0i) =>
     int strg = 0
-    if not na(h0)
-        for x = 1 to 300
-            int ago = bar_index - h0i + x
-            if ago > 480
+    for x = 1 to 300
+        int ago = bar_index - h0i + x
+        if ago > 480
+            break
+        if f_h(dir, ago) >= h0
+            break
+        strg += 1
+    strg
+
+// nearest intact swing low (transformed) below `below`: the liquidity the 4-candle trade targets
+f_liqBelow(int dir, array<int> loIdx, array<float> loPx, float below) =>
+    float best = na
+    float runMin = na
+    int scanned = 0
+    int lim = math.min(2 * lookback, 450)
+    int m = array.size(loIdx)
+    if m > 0
+        for q = m - 1 to 0
+            int agoP = bar_index - array.get(loIdx, q)
+            if agoP > lim
                 break
-            if f_h(dir, ago) >= h0
-                break
-            strg += 1
-    if not na(h0)
-        // step 1b: displacement within 3 bars after the LB
-        bool disp = false
-        for j = 1 to math.min(3, k)
-            int ago = k - j
-            bool closeBelow = f_c(dir, ago) < f_l(dir, ago + 1)
-            bool fvg = ago >= 1 and f_h(dir, ago - 1) < f_l(dir, ago + 1)
-            if closeBelow or fvg
-                disp := true
-                break
-        if disp or not needDisp
-            float bodyTop = math.max(f_o(dir, k), f_c(dir, k))
-            float entry = entryMode == "Swept level" ? h0 : entryMode == "LB candle body" ? bodyTop : (h1 + math.min(h0, bodyTop)) / 2
-            if entry < h1 - 0.05 * a
-                float sl = math.max(h1 + slBufAtr * a, entry + minRiskAtr * a)
-                // BOS reference: last swing low between H0 and H1, else lowest bar low there
-                float lp = na
-                int m = array.size(loIdx)
-                if m > 0
-                    for q = m - 1 to 0
-                        int li = array.get(loIdx, q)
-                        if li < i and li > h0i
-                            lp := array.get(loPx, q)
-                            break
-                        if li <= h0i
-                            break
-                if na(lp) and h0i + 1 <= i - 1
-                    for x = h0i + 1 to i - 1
-                        float v = f_l(dir, bar_index - x)
-                        if na(lp) or v < lp
-                            lp := v
-                if not na(lp)
+            while scanned < agoP
+                float v = f_l(dir, scanned)
+                runMin := na(runMin) ? v : math.min(runMin, v)
+                scanned += 1
+            float lpv = array.get(loPx, q)
+            if lpv < below and (na(runMin) or runMin >= lpv) and (na(best) or lpv > best)
+                best := lpv
+    best
+
+// draw an armed setup the way Marco marks it
+f_drawArmed(Setup s, int ihIdx, string why) =>
+    int dir = s.dir
+    float e = f_real(dir, s.entry)
+    float st = f_real(dir, s.sl)
+    float t = f_real(dir, s.tp)
+    bool marco = s.model > 0
+    string side = dir == 1 ? "SELL" : "BUY"
+    string who = dir == 1 ? "sellers" : "buyers"
+    string gTxt = useIE ? "  " + s.grade : ""
+    string nm = s.model == 2 ? "  4-candle" : ""
+    s.riskBox := box.new(bar_index, st, bar_index + 15, e, border_color=color.new(#ef5350, 40), bgcolor=colRisk, text=marco ? "SL beyond LB" : "", text_size=size.tiny, text_color=#ef5350, text_halign=text.align_right)
+    s.rewBox := box.new(bar_index, e, bar_index + 15, t, border_color=color.new(#26a69a, 40), bgcolor=colRew, text=marco ? "$$$ target" : "", text_size=size.tiny, text_color=#26a69a, text_halign=text.align_right, text_valign=dir == 1 ? text.align_bottom : text.align_top)
+    string tip = (useIE ? "IE grade " + s.grade + (s.grade == "A" ? " (poora risk)" : s.grade == "B" ? " (aadha risk)" : "") + "\n" + why + "\n" : "") + "T1 par 80% close + stop break-even"
+    s.tag := label.new(bar_index, e, side + gTxt + "  RR 1:" + str.tostring(s.rr, "#.0") + nm, style=label.style_label_left, color=dir == 1 ? #ef5350 : #26a69a, textcolor=color.white, size=size.small, tooltip=tip)
+    if marco and not na(ihIdx)
+        s.ihLbl := label.new(ihIdx, e, "$$$", style=dir == 1 ? label.style_label_down : label.style_label_up, color=#00000000, textcolor=colLiq, size=size.small, tooltip="Early " + who + "' stops sit beyond this " + (dir == 1 ? "high" : "low") + ". When it is stabbed they are trapped: that is the entry.")
+    if s.model == 1
+        s.indLbl := label.new(s.extBar, t, who + " induced", style=dir == 1 ? label.style_label_up : label.style_label_down, color=#00000000, textcolor=color.gray, size=size.small, tooltip="BOS for retail: the move away from the LB makes retail " + (dir == 1 ? "sell" : "buy") + ". Marco waits for them to get trapped.")
+    if marco and not na(s.lvlBar)
+        s.swLine := line.new(s.lvlBar, f_real(dir, s.lvl), s.lbBar, f_real(dir, s.lvl), color=color.gray, style=line.style_dashed, width=1)
+    if not na(s.lbBox)
+        box.set_text(s.lbBox, "LB")
+    alert((marco ? "IE Marco " : "Da Vinci ") + side + " " + syminfo.ticker + " " + timeframe.period + (useIE ? " | IE " + s.grade : "") + " | Entry " + str.tostring(e, format.mintick) + " | SL " + str.tostring(st, format.mintick) + " | TP " + str.tostring(t, format.mintick) + " | RR 1:" + str.tostring(s.rr, "#.0"), alert.freq_once_per_bar_close)
+    true
+
+// remove the drawings of an order that was cancelled
+f_undraw(Setup s) =>
+    if not na(s.riskBox)
+        box.delete(s.riskBox)
+    if not na(s.rewBox)
+        box.delete(s.rewBox)
+    if not na(s.tag)
+        label.delete(s.tag)
+    if not na(s.ihLbl)
+        label.delete(s.ihLbl)
+    if not na(s.indLbl)
+        label.delete(s.indLbl)
+    if not na(s.swLine)
+        line.delete(s.swLine)
+    true
+
+// create a liquidity block when a new swing high (transformed) is confirmed
+f_tryCreate(int dir, array<int> hiIdx, array<float> hiPx, array<int> loIdx, array<float> loPx, bool marco) =>
+    int i = bar_index - k
+    float h1 = f_h(dir, k)
+    float a = atr[k]
+    Setup s = na
+    if a > 0
+        [h0, h0i] = f_sweptHigh(dir, hiIdx, hiPx, i, h1)
+        if not na(h0)
+            int strg = f_strength(dir, h0, h0i)
+            // displacement within 3 bars after the LB
+            bool disp = false
+            for j = 1 to math.min(3, k)
+                int ago = k - j
+                bool closeBelow = f_c(dir, ago) < f_l(dir, ago + 1)
+                bool fvg = ago >= 1 and f_h(dir, ago - 1) < f_l(dir, ago + 1)
+                if closeBelow or fvg
+                    disp := true
+                    break
+            if disp or not needDisp
+                float bodyTop = math.max(f_o(dir, k), f_c(dir, k))
+                float lbBot = math.min(h0, bodyTop)
+                if marco
                     // replay the k bars after the LB that are already known
-                    float ext = na
-                    int extBar = na
-                    int bosBar = na
+                    float ext = f_l(dir, k)
+                    int extBar = i
                     bool dead = false
                     for ago = k - 1 to 0
                         if f_c(dir, ago) > h1
                             dead := true
-                        if na(bosBar) and f_l(dir, ago) < lp
-                            bosBar := bar_index - ago
-                        if na(ext) or f_l(dir, ago) < ext
+                        if f_l(dir, ago) < ext
                             ext := f_l(dir, ago)
                             extBar := bar_index - ago
                     if not dead
-                        box b = showForming ? box.new(i, f_real(dir, h1), bar_index + 3, f_real(dir, math.min(h0, bodyTop)), border_color=color.new(#5b8cff, 30), bgcolor=colLB) : na
-                        s := Setup.new(dir, i, h1, entry, sl, lp, bosBar, ext, extBar, 0, false, 0, na, na, na, b, na, na, na, strg)
+                        box b = showForming ? box.new(i, f_real(dir, h1), bar_index + 3, f_real(dir, lbBot), border_color=color.new(#5b8cff, 30), bgcolor=colLB, text="LB", text_size=size.tiny, text_color=#5b8cff, text_halign=text.align_left, text_valign=dir == 1 ? text.align_top : text.align_bottom) : na
+                        s := Setup.new(dir=dir, model=1, lbBar=i, top=h1, lbBot=lbBot, lvl=h0, lvlBar=h0i, a=a, ext=ext, extBar=extBar, born=bar_index, lstr=strg, lbBox=b)
+                else
+                    float entry = entryMode == "Swept level" ? h0 : entryMode == "LB candle body" ? bodyTop : (h1 + math.min(h0, bodyTop)) / 2
+                    if entry < h1 - 0.05 * a
+                        float sl = math.max(h1 + dvSlBuf * a, entry + dvMinRisk * a)
+                        // BOS reference: last swing low between H0 and H1, else lowest bar low there
+                        float lp = na
+                        int m = array.size(loIdx)
+                        if m > 0
+                            for q = m - 1 to 0
+                                int li = array.get(loIdx, q)
+                                if li < i and li > h0i
+                                    lp := array.get(loPx, q)
+                                    break
+                                if li <= h0i
+                                    break
+                        if na(lp) and h0i + 1 <= i - 1
+                            for x = h0i + 1 to i - 1
+                                float v = f_l(dir, bar_index - x)
+                                if na(lp) or v < lp
+                                    lp := v
+                        if not na(lp)
+                            float ext = na
+                            int extBar = na
+                            int bosBar = na
+                            bool dead = false
+                            for ago = k - 1 to 0
+                                if f_c(dir, ago) > h1
+                                    dead := true
+                                if na(bosBar) and f_l(dir, ago) < lp
+                                    bosBar := bar_index - ago
+                                if na(ext) or f_l(dir, ago) < ext
+                                    ext := f_l(dir, ago)
+                                    extBar := bar_index - ago
+                            if not dead
+                                box b = showForming ? box.new(i, f_real(dir, h1), bar_index + 3, f_real(dir, lbBot), border_color=color.new(#5b8cff, 30), bgcolor=colLB, text="LB", text_size=size.tiny, text_color=#5b8cff, text_halign=text.align_left, text_valign=dir == 1 ? text.align_top : text.align_bottom) : na
+                                s := Setup.new(dir=dir, model=0, lbBar=i, top=h1, lbBot=lbBot, lvl=h0, lvlBar=h0i, a=a, entry=entry, sl=sl, lp=lp, bosBar=bosBar, ext=ext, extBar=extBar, born=bar_index, lstr=strg, lbBox=b)
+    s
+
+// 4-candle model, checked at the close of candle 3 (c1 = [2], c2 = [1], c3 = [0])
+f_candle4(int dir, array<int> hiIdx, array<float> hiPx, array<int> loIdx, array<float> loPx) =>
+    Setup s = na
+    float h1c = f_h(dir, 2)
+    float h2 = f_h(dir, 1)
+    float l2 = f_l(dir, 1)
+    float o2 = f_o(dir, 1)
+    float c2 = f_c(dir, 1)
+    float h3 = f_h(dir, 0)
+    float l3 = f_l(dir, 0)
+    float a = atr[1]
+    float rng = h2 - l2
+    if a > 0 and h2 > h1c and rng > 0 and h2 - math.max(o2, c2) >= wickFrac * rng and c2 < h1c and h3 < h2
+        [h0x, h0ix] = f_sweptHigh(dir, hiIdx, hiPx, bar_index - 1, h2)
+        float h0 = na(h0x) ? h1c : h0x
+        int h0i = na(h0x) ? bar_index - 2 : h0ix
+        float ext = math.min(l2, l3)
+        int extBar = l3 < l2 ? bar_index : bar_index - 1
+        float tp = f_liqBelow(dir, loIdx, loPx, ext)
+        if not na(tp)
+            float entry = h3
+            float sl = math.max(h2 + slBufAtr * a, entry + minRiskAtr * a)
+            float risk = sl - entry
+            float rr = risk > 0 ? (entry - tp) / risk : 0.0
+            if risk > 0 and rr >= minRR and rr <= maxRR
+                int strg = f_strength(dir, h0, h0i)
+                [g, why] = f_grade(dir, f_real(dir, entry), f_real(dir, h2), risk, strg)
+                if not useIE or f_rank(g) >= f_rank(ieMin)
+                    box b = box.new(bar_index - 1, f_real(dir, h2), bar_index + c4Window, f_real(dir, h3), border_color=color.new(#5b8cff, 30), bgcolor=colLB, text="LB", text_size=size.tiny, text_color=#5b8cff, text_halign=text.align_left, text_valign=dir == 1 ? text.align_top : text.align_bottom)
+                    s := Setup.new(dir=dir, model=2, lbBar=bar_index - 1, top=h2, lbBot=h3, lvl=h0, lvlBar=h0i, a=a, entry=entry, sl=sl, ext=ext, extBar=extBar, state=1, tp=tp, rr=rr, armBar=bar_index, expBar=bar_index + c4Window, born=bar_index, lstr=strg, grade=g, lbBox=b)
+                    f_drawArmed(s, bar_index, why)
     s
 
 // update one setup with the current bar; returns true when it is finished
-f_step(Setup s, bool phNew, float phT, int phIdx, bool plNew, float plT, int plIdx) =>
+f_step(Setup s, bool phNew, float phT, int phIdx, bool plNew, float plT, int plIdx, bool ihNew, float ihT, int ihIdx) =>
     int dir = s.dir
     float h = f_h(dir, 0)
     float l = f_l(dir, 0)
@@ -466,57 +639,89 @@ f_step(Setup s, bool phNew, float phT, int phIdx, bool plNew, float plT, int plI
             if not na(s.lbBox)
                 box.delete(s.lbBox)
         else
-            if na(s.bosBar) and l < s.lp
-                s.bosBar := bar_index
-            if l < s.ext
-                s.ext := l
-                s.extBar := bar_index
-                s.resp := false
-            if phNew and not na(s.bosBar) and phIdx > s.bosBar and phT < s.entry
-                s.build += 1
-            if plNew and not s.resp and plIdx > s.extBar and plT >= s.ext - 0.15 * a
-                s.resp := true
             if not na(s.lbBox)
                 box.set_right(s.lbBox, bar_index + 3)
-            bool ready = not na(s.bosBar) and s.build >= minBuild and (s.resp or not needResp) and bar_index >= s.lbBar + k
-            if ready and h < s.entry and inSess and f_biasOk(dir) and ieTimeOk
-                float risk = s.sl - s.entry
-                float tp = tpMode == "Fixed R" ? s.entry - fixedR * risk : s.ext
-                bool okTP = tpMode != "Fixed R" or tp >= s.ext
-                float rr = (s.entry - tp) / risk
-                if okTP and rr >= minRR and rr <= maxRR
-                    float e = f_real(dir, s.entry)
-                    float st = f_real(dir, s.sl)
-                    float t = f_real(dir, tp)
-                    [g, why] = f_grade(dir, e, f_real(dir, s.top), risk, s.lstr)
-                    if not useIE or f_rank(g) >= f_rank(ieMin)
-                        s.tp := tp
-                        s.rr := rr
-                        s.state := 1
-                        string gTxt = useIE ? "  " + g : ""
-                        s.riskBox := box.new(bar_index, st, bar_index + 15, e, border_color=color.new(#ef5350, 40), bgcolor=colRisk)
-                        s.rewBox := box.new(bar_index, e, bar_index + 15, t, border_color=color.new(#26a69a, 40), bgcolor=colRew)
-                        s.tag := label.new(bar_index, e, (dir == 1 ? "SELL" : "BUY") + gTxt + "  RR 1:" + str.tostring(rr, "#.0"), style=label.style_label_left, color=dir == 1 ? #ef5350 : #26a69a, textcolor=color.white, size=size.small, tooltip=useIE ? "IE grade " + g + (g == "A" ? " (poora risk)" : g == "B" ? " (aadha risk)" : "") + "\n" + why + "\nT1 par 80% close + stop break-even" : "")
-                        alert((dir == 1 ? "Da Vinci SELL " : "Da Vinci BUY ") + syminfo.ticker + " " + timeframe.period + (useIE ? " | IE " + g : "") + " | Entry " + str.tostring(e, format.mintick) + " | SL " + str.tostring(st, format.mintick) + " | TP " + str.tostring(t, format.mintick) + " | RR 1:" + str.tostring(rr, "#.0"), alert.freq_once_per_bar_close)
+            if s.model == 1
+                // Marco: wait for the inducement high inside the LB, enter the moment it is stabbed
+                if l < s.ext
+                    s.ext := l
+                    s.extBar := bar_index
+                if ihNew and ihIdx > s.extBar and ihIdx > s.lbBar and ihT < s.top and (not insideLB or ihT >= s.lbBot) and inSess and f_biasOk(dir) and ieTimeOk
+                    float entry = ihT
+                    float sl = math.max(s.top + slBufAtr * s.a, entry + minRiskAtr * s.a)
+                    float risk = sl - entry
+                    float rr = risk > 0 ? (entry - s.ext) / risk : 0.0
+                    if risk > 0 and rr >= minRR and rr <= maxRR
+                        [g, why] = f_grade(dir, f_real(dir, entry), f_real(dir, s.top), risk, s.lstr)
+                        if not useIE or f_rank(g) >= f_rank(ieMin)
+                            s.entry := entry
+                            s.sl := sl
+                            s.tp := s.ext
+                            s.rr := rr
+                            s.grade := g
+                            s.state := 1
+                            s.armBar := bar_index
+                            s.expBar := bar_index + maxWait
+                            if not na(s.lbBox)
+                                box.set_bottom(s.lbBox, f_real(dir, math.min(s.lbBot, entry)))
+                            f_drawArmed(s, ihIdx, why)
+            else
+                // Da Vinci: BOS, buildup of lower highs, a respected low, then a limit back at the swept level
+                if na(s.bosBar) and l < s.lp
+                    s.bosBar := bar_index
+                if l < s.ext
+                    s.ext := l
+                    s.extBar := bar_index
+                    s.resp := false
+                if phNew and not na(s.bosBar) and phIdx > s.bosBar and phT < s.entry
+                    s.build := s.build + 1
+                if plNew and not s.resp and plIdx > s.extBar and plT >= s.ext - 0.15 * a
+                    s.resp := true
+                bool ready = not na(s.bosBar) and s.build >= minBuild and (s.resp or not needResp) and bar_index >= s.lbBar + k
+                if ready and h < s.entry and inSess and f_biasOk(dir) and ieTimeOk
+                    float risk = s.sl - s.entry
+                    float tp = tpMode == "Fixed R" ? s.entry - fixedR * risk : s.ext
+                    bool okTP = tpMode != "Fixed R" or tp >= s.ext
+                    float rr = (s.entry - tp) / risk
+                    if okTP and rr >= minRR and rr <= maxRR
+                        [g, why] = f_grade(dir, f_real(dir, s.entry), f_real(dir, s.top), risk, s.lstr)
+                        if not useIE or f_rank(g) >= f_rank(ieMin)
+                            s.tp := tp
+                            s.rr := rr
+                            s.grade := g
+                            s.state := 1
+                            s.armBar := bar_index
+                            s.expBar := s.lbBar + maxWait
+                            f_drawArmed(s, na, why)
     else if s.state == 1
         box.set_right(s.riskBox, bar_index + 5)
         box.set_right(s.rewBox, bar_index + 5)
+        if not na(s.lbBox)
+            box.set_right(s.lbBox, bar_index + 5)
         if h >= s.entry
             s.state := 2
             s.fillBar := bar_index
             if not na(s.lbBox)
                 box.set_right(s.lbBox, bar_index)
-            alert("Da Vinci entry filled " + syminfo.ticker + " " + timeframe.period, alert.freq_once_per_bar)
+            if s.model > 0
+                label.new(bar_index, f_real(dir, s.entry), dir == 1 ? "sellers trapped" : "buyers trapped", style=dir == 1 ? label.style_label_down : label.style_label_up, color=#00000000, textcolor=dir == 1 ? #ef5350 : #26a69a, size=size.small)
+            alert((s.model > 0 ? "IE Marco" : "Da Vinci") + " entry filled " + syminfo.ticker + " " + timeframe.period, alert.freq_once_per_bar)
             if h >= s.sl
                 s.state := 3
                 fin := true
-        else if l <= s.tp or bar_index - s.lbBar > maxWait
-            fin := true
-            box.delete(s.riskBox)
-            box.delete(s.rewBox)
-            label.delete(s.tag)
-            if not na(s.lbBox)
-                box.delete(s.lbBox)
+        else if l <= s.tp or (useSess and not inSess) or bar_index > s.expBar
+            // order cancelled: target reached first, session over or too late
+            f_undraw(s)
+            s.tries := s.tries + 1
+            if s.model == 1 and s.tries < maxTries and c <= s.top and bar_index - s.lbBar <= maxWait
+                s.state := 0
+                if not na(s.lbBox)
+                    box.set_bottom(s.lbBox, f_real(dir, s.lbBot))
+                    box.set_text(s.lbBox, "LB")
+            else
+                fin := true
+                if not na(s.lbBox)
+                    box.delete(s.lbBox)
     if s.state == 2 and not fin
         box.set_right(s.riskBox, bar_index)
         box.set_right(s.rewBox, bar_index)
@@ -533,16 +738,28 @@ f_step(Setup s, bool phNew, float phT, int phIdx, bool plNew, float plT, int plI
 float phS = newPH ? high[k] : na
 float plS = newPL ? low[k] : na
 int pIdx = bar_index - k
+float ihS = newIH ? high[entryK] : na
+float ilS = newIL ? low[entryK] : na
+int eIdx = bar_index - entryK
 
 // shorts: highs = swing highs, lows = swing lows; longs: highs = -swing lows, lows = -swing highs
-if newPH
-    Setup s = f_tryCreate(1, hiIdxS, hiPxS, loIdxS, loPxS)
+if newPH and (useDV or usePivotM)
+    Setup s = f_tryCreate(1, hiIdxS, hiPxS, loIdxS, loPxS, usePivotM)
     if not na(s)
         array.push(setups, s)
-if newPL
-    Setup s = f_tryCreate(-1, hiIdxL, hiPxL, loIdxL, loPxL)
+if newPL and (useDV or usePivotM)
+    Setup s = f_tryCreate(-1, hiIdxL, hiPxL, loIdxL, loPxL, usePivotM)
     if not na(s)
         array.push(setups, s)
+if useC4 and inSess and ieTimeOk and bar_index > 3
+    if f_biasOk(1)
+        Setup s = f_candle4(1, hiIdxS, hiPxS, loIdxS, loPxS)
+        if not na(s)
+            array.push(setups, s)
+    if f_biasOk(-1)
+        Setup s = f_candle4(-1, hiIdxL, hiPxL, loIdxL, loPxL)
+        if not na(s)
+            array.push(setups, s)
 
 if array.size(setups) > 0
     for q = array.size(setups) - 1 to 0
@@ -551,9 +768,11 @@ if array.size(setups) > 0
         float phT = s.dir == 1 ? phS : -plS
         bool plNew = s.dir == 1 ? newPL : newPH
         float plT = s.dir == 1 ? plS : -phS
-        if s.lbBar != pIdx or s.state > 0
+        bool ihNew = s.dir == 1 ? newIH : newIL
+        float ihT = s.dir == 1 ? ihS : -ilS
+        if s.born != bar_index
             int before = s.state
-            bool fin = f_step(s, phNew, phT, pIdx, plNew, plT, pIdx)
+            bool fin = f_step(s, phNew, phT, pIdx, plNew, plT, pIdx, ihNew, ihT, eIdx)
             if before < 2 and s.state >= 2
                 dayTrades += 1
             if fin and s.state == 3
@@ -568,6 +787,11 @@ if array.size(setups) > 0
                     sumR += s.rr - costR
                     label.set_text(s.tag, label.get_text(s.tag) + "  +" + str.tostring(s.rr, "#.0") + "R")
                 array.remove(setups, q)
+// keep the list small (oldest waiting blocks go first)
+if array.size(setups) > 80
+    Setup old = array.shift(setups)
+    if old.state == 0 and not na(old.lbBox)
+        box.delete(old.lbBox)
 
 // store this bar's new pivots after processing (they become "older" swings for future setups)
 if newPH
@@ -577,17 +801,103 @@ if newPL
     f_push(loIdxS, loPxS, pIdx, low[k])
     f_push(hiIdxL, hiPxL, pIdx, -low[k])
 
+// ---------- Marco's liquidity marks ----------
+// "if this high never touched into this high ... you wouldn't be plotting a line on this high. However ...
+// price back up, respects the high to the left, and we sell off. So, we have liquidity."
+var lqHPx = array.new_float()
+var lqHIdx = array.new_int()
+var lqHLn = array.new_line()
+var lqLPx = array.new_float()
+var lqLIdx = array.new_int()
+var lqLLn = array.new_line()
+
+// a level is taken: end its ray here and stop tracking it
+f_lqTake(array<float> px, array<int> ix, array<line> ln, bool isHigh) =>
+    int n = array.size(px)
+    if n > 0
+        for q = n - 1 to 0
+            float p = array.get(px, q)
+            if isHigh ? high > p : low < p
+                line l = array.get(ln, q)
+                if not na(l)
+                    line.set_x2(l, bar_index)
+                    line.set_extend(l, extend.none)
+                    line.set_style(l, line.style_dotted)
+                array.remove(px, q)
+                array.remove(ix, q)
+                array.remove(ln, q)
+    true
+
+// a new swing respected an older one (came close, did not take it): the older one is liquidity
+f_lqAdd(array<float> px, array<int> ix, array<line> ln, float p, int idx, bool isHigh) =>
+    float tol = liqTol * atr
+    int n = array.size(px)
+    if n > 0 and tol > 0
+        for q = 0 to n - 1
+            float lv = array.get(px, q)
+            line l = array.get(ln, q)
+            bool resp = isHigh ? (p <= lv and p >= lv - tol) : (p >= lv and p <= lv + tol)
+            if na(l) and resp and idx - array.get(ix, q) >= 2
+                array.set(ln, q, line.new(array.get(ix, q), lv, bar_index, lv, extend=extend.right, color=colLiq, style=line.style_solid, width=1))
+                label.new(idx, lv, "$$$", style=isHigh ? label.style_label_down : label.style_label_up, color=#00000000, textcolor=colLiq, size=size.tiny, tooltip=isHigh ? "This high respected the high to the left: buy stops rest above (liquidity)" : "This low respected the low to the left: sell stops rest below (liquidity)")
+    line none = na
+    array.push(px, p)
+    array.push(ix, idx)
+    array.push(ln, none)
+    if array.size(px) > 60
+        line oldL = array.shift(ln)
+        if not na(oldL)
+            line.set_x2(oldL, bar_index)
+            line.set_extend(oldL, extend.none)
+        array.shift(px)
+        array.shift(ix)
+    true
+
+if showLiq
+    f_lqTake(lqHPx, lqHIdx, lqHLn, true)
+    f_lqTake(lqLPx, lqLIdx, lqLLn, false)
+    if newPH
+        f_lqAdd(lqHPx, lqHIdx, lqHLn, high[k], pIdx, true)
+    if newPL
+        f_lqAdd(lqLPx, lqLIdx, lqLLn, low[k], pIdx, false)
+
+// today's session liquidity: previous day high/low, Asia and London ranges ("who is induced?")
+var sessLines = array.new_line()
+var sessLabels = array.new_label()
+f_sessLvl(int x1, float y, string nm, bool taken) =>
+    if not na(x1) and not na(y)
+        color col = taken ? color.new(color.gray, 20) : colLiq
+        array.push(sessLines, line.new(x1, y, bar_index + 8, y, color=col, style=taken ? line.style_dotted : line.style_dashed, width=1))
+        array.push(sessLabels, label.new(bar_index + 8, y, nm + (taken ? " taken" : " $$$"), style=label.style_label_left, color=#00000000, textcolor=col, size=size.small))
+    true
+if showSessLiq and barstate.islast
+    while array.size(sessLines) > 0
+        line.delete(array.pop(sessLines))
+    while array.size(sessLabels) > 0
+        label.delete(array.pop(sessLabels))
+    f_sessLvl(dayStartBar, pdh, "PDH", dayH > pdh)
+    f_sessLvl(dayStartBar, pdl, "PDL", dayL < pdl)
+    if nyH < 17 and not na(aftAsiaH)
+        f_sessLvl(asiaStartBar, asiaH, "Asia H", aftAsiaH > asiaH)
+        f_sessLvl(asiaStartBar, asiaL, "Asia L", aftAsiaL < asiaL)
+    if nyH >= 5 and nyH < 17 and not na(aftLonH)
+        f_sessLvl(lonStartBar, lonH, "London H", aftLonH > lonH)
+        f_sessLvl(lonStartBar, lonL, "London L", aftLonL < lonL)
+
 // ---------- stats table ----------
-var table tb = table.new(position.top_right, 2, 5, bgcolor=color.new(color.black, 20), border_width=1)
+var table tb = table.new(position.top_right, 2, 6, bgcolor=color.new(color.black, 20), border_width=1)
 if showStats and barstate.islast
     int n = wins + losses
-    table.cell(tb, 0, 0, useIE ? "Da Vinci, IE grade " + ieMin + "+" : "Da Vinci (this chart)", text_color=color.white, text_size=size.small)
+    string mName = useDV ? "Da Vinci" : usePivotM and useC4 ? "Marco + 4-candle" : useC4 ? "Marco 4-candle" : "Marco LB + liquidity"
+    table.cell(tb, 0, 0, "This chart" + (useIE ? ", IE grade " + ieMin + "+" : ""), text_color=color.white, text_size=size.small)
     table.cell(tb, 1, 0, "", text_color=color.white)
-    table.cell(tb, 0, 1, "Trades", text_color=color.white, text_size=size.small)
-    table.cell(tb, 1, 1, str.tostring(n), text_color=color.white, text_size=size.small)
-    table.cell(tb, 0, 2, "Win rate", text_color=color.white, text_size=size.small)
-    table.cell(tb, 1, 2, n > 0 ? str.tostring(100.0 * wins / n, "#") + "%" : "-", text_color=color.white, text_size=size.small)
-    table.cell(tb, 0, 3, "Avg R / trade", text_color=color.white, text_size=size.small)
-    table.cell(tb, 1, 3, n > 0 ? str.tostring(sumR / n, "#.00") : "-", text_color=sumR >= 0 ? color.lime : color.red, text_size=size.small)
-    table.cell(tb, 0, 4, "Total R", text_color=color.white, text_size=size.small)
-    table.cell(tb, 1, 4, str.tostring(sumR, "#.0"), text_color=sumR >= 0 ? color.lime : color.red, text_size=size.small)
+    table.cell(tb, 0, 1, "Model", text_color=color.white, text_size=size.small)
+    table.cell(tb, 1, 1, mName, text_color=color.white, text_size=size.small)
+    table.cell(tb, 0, 2, "Trades", text_color=color.white, text_size=size.small)
+    table.cell(tb, 1, 2, str.tostring(n), text_color=color.white, text_size=size.small)
+    table.cell(tb, 0, 3, "Win rate", text_color=color.white, text_size=size.small)
+    table.cell(tb, 1, 3, n > 0 ? str.tostring(100.0 * wins / n, "#") + "%" : "-", text_color=color.white, text_size=size.small)
+    table.cell(tb, 0, 4, "Avg R / trade", text_color=color.white, text_size=size.small)
+    table.cell(tb, 1, 4, n > 0 ? str.tostring(sumR / n, "#.00") : "-", text_color=sumR >= 0 ? color.lime : color.red, text_size=size.small)
+    table.cell(tb, 0, 5, "Total R", text_color=color.white, text_size=size.small)
+    table.cell(tb, 1, 5, str.tostring(sumR, "#.0"), text_color=sumR >= 0 ? color.lime : color.red, text_size=size.small)
